@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"go-inventory-reservations/internal/handler"
 	"go-inventory-reservations/internal/router"
 	"os"
 	"os/signal"
@@ -38,8 +39,9 @@ func New() (*Kernel, error) {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
+	handlers := handler.NewHandlers(log)
 	engine := gin.Default()
-	router.SetupRoutes(engine)
+	router.SetupRoutes(engine, *handlers)
 
 	kernel := &Kernel{
 		Config:   cfg,
