@@ -5,9 +5,9 @@ import (
 	"go-inventory-reservations/internal/handler"
 )
 
-func SetupRoutes(engine *gin.Engine, handlers handler.Handlers) {
+func SetupRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
 	setupAppHealthRoutes(engine)
-	setupAdminRoutes(engine, handlers)
-	setupStockRoutes(engine, handlers)
-	setupReservationRoutes(engine, handlers)
+	setupAdminRoutes(engine, handlersPool)
+	setupStockRoutes(engine, handlersPool)
+	setupReservationRoutes(engine, handlersPool)
 }

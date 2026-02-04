@@ -6,10 +6,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Logger represents a custom logger instance
 type Logger struct {
 	*logrus.Logger
 }
 
+// New creates a new Logger instance
 func New(level, format string) *Logger {
 	log := logrus.New()
 
@@ -39,10 +41,12 @@ func New(level, format string) *Logger {
 	return &Logger{Logger: log}
 }
 
+// WithField adds a new field to the logger
 func (l *Logger) WithField(key string, value interface{}) *logrus.Entry {
 	return l.Logger.WithField(key, value)
 }
 
+// WithFields adds multiple fields to the logger
 func (l *Logger) WithFields(fields logrus.Fields) *logrus.Entry {
 	return l.Logger.WithFields(fields)
 }

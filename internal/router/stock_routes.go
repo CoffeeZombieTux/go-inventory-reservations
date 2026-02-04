@@ -5,8 +5,8 @@ import (
 	"go-inventory-reservations/internal/handler"
 )
 
-func setupStockRoutes(engine *gin.Engine, handlers handler.Handlers) {
+func setupStockRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
 	admin := engine.Group("/stock")
-	admin.GET("/stock/:sku", handlers.GetStockBySku)
-	admin.POST("/stock/:skus", handlers.GetStockBySkus)
+	admin.GET("/:sku", handlersPool.Stock.GetStockBySku)
+	admin.GET("/", handlersPool.Stock.GetStocks) // use limit and offset query params
 }

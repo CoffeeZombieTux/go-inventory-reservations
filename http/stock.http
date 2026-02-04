@@ -1,0 +1,33 @@
+### Create stock
+POST http://localhost:8080/admin/stock
+Content-Type: application/json
+
+{
+  "sku": "127",
+  "qty": 1
+}
+
+### Update stock qty
+PUT http://localhost:8080/admin/stock
+Content-Type: application/json
+
+{
+  "sku": "127",
+  "qty": 2
+}
+
+### Delete stock record
+DELETE http://localhost:8080/admin/stock/127
+Content-Type: application/json
+
+### Get Stock by sku
+GET http://localhost:8080/stock/127
+Content-Type: application/json
+
+### Get Stocks with pagination
+GET http://localhost:8080/stock?limit=2&offset=2
+Content-Type: application/json
+
+### Get Stocks with pagination default values limit=50&offset=0
+GET http://localhost:8080/stock
+Content-Type: application/json

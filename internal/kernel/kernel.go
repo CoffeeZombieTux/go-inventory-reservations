@@ -4,25 +4,31 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"go-inventory-reservations/internal/config"
+	"go-inventory-reservations/internal/database"
 	"go-inventory-reservations/internal/handler"
+	"go-inventory-reservations/internal/logger"
+	"go-inventory-reservations/internal/repository"
 	"go-inventory-reservations/internal/router"
+	"go-inventory-reservations/internal/service"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
-
-	"go-inventory-reservations/internal/config"
-	"go-inventory-reservations/internal/database"
-	"go-inventory-reservations/internal/logger"
+	"time"
 )
 
+// Kernel is the main application kernel. It contains all required dependencies and handles the application lifecycle.
 type Kernel struct {
-	Config   *config.Config
-	Logger   *logger.Logger
-	Database *database.Database
-	Server   *gin.Engine
+	Config       *config.Config
+	Logger       *logger.Logger
+	DBConnection *database.Database
+	Router       *gin.Engine
+	HTTPServer   *http.Server
 }
 
+// New creates and initializes a new Kernel instance.
 func New() (*Kernel, error) {
 	// Load config
 	cfg, err := config.Load()
@@ -39,56 +45,91 @@ func New() (*Kernel, error) {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	handlers := handler.NewHandlers(log)
-	engine := gin.Default()
-	router.SetupRoutes(engine, *handlers)
+	// Repositories
+	stockRepo := repository.NewStockRepository(db.DB)
+	reservationRepo := repository.NewReservationRepository(db.DB)
+
+	// Services
+	stockService := service.NewStockService(stockRepo)
+	reservationService := service.NewReservationService(reservationRepo)
+
+	// Handlers (with all required services)
+	handlersPool := handler.NewHandlersPool(stockService, reservationService, log)
+
+	// Gin router and HTTP server setup
+	routerEngine := gin.Default()
+	router.SetupRoutes(routerEngine, *handlersPool)
+
+	port := strconv.Itoa(cfg.Server.Port)
+	httpServer := &http.Server{
+		Addr:    ":" + port,
+		Handler: routerEngine,
+	}
 
 	kernel := &Kernel{
-		Config:   cfg,
-		Logger:   log,
-		Database: db,
-		Server:   engine,
+		Config:       cfg,
+		Logger:       log,
+		DBConnection: db,
+		Router:       routerEngine,
+		HTTPServer:   httpServer,
 	}
 
 	log.Info("Kernel initialized successfully")
 	return kernel, nil
 }
 
+// Start starts the application kernel and the HTTP server (in a goroutine).
 func (k *Kernel) Start(ctx context.Context) error {
 	k.Logger.Info("Starting kernel...")
 
-	if err := k.Database.HealthCheck(); err != nil {
+	if err := k.DBConnection.HealthCheck(); err != nil {
 		return fmt.Errorf("database health check failed: %w", err)
 	}
+	k.Logger.Info("Database health check successful")
 
-	port := strconv.Itoa(k.Config.Server.Port)
-	if err := k.Server.Run(":" + port); err != nil {
-		return fmt.Errorf("server failed: %v", err)
-	}
-	k.Logger.Info("🚀 Starting server on port %s...", port)
+	go func() {
+		k.Logger.Infof("🚀 Starting HTTP server on %s...", k.HTTPServer.Addr)
+		if err := k.HTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			k.Logger.WithError(err).Error("Server failed")
+		}
+	}()
+
 	k.Logger.Info("Kernel started successfully")
 	return nil
 }
 
+// Stop gracefully shuts down the HTTP server and closes the database connection.
 func (k *Kernel) Stop(ctx context.Context) error {
 	k.Logger.Info("Stopping kernel...")
 
-	if err := k.Database.Close(); err != nil {
+	// Graceful server shutdown with timeout
+	ctxShutdown, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := k.HTTPServer.Shutdown(ctxShutdown); err != nil {
+		k.Logger.WithError(err).Error("Graceful server shutdown failed")
+	} else {
+		k.Logger.Info("HTTP server stopped gracefully")
+	}
+
+	if err := k.DBConnection.Close(); err != nil {
 		k.Logger.WithError(err).Error("Failed to close database connection")
+	} else {
+		k.Logger.Info("Database connection closed")
 	}
 
 	k.Logger.Info("Kernel stopped successfully")
 	return nil
 }
 
+// WaitForShutdown waits for a SIGINT or SIGTERM signal and then returns.
 func (k *Kernel) WaitForShutdown() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
 	sig := <-quit
 	k.Logger.WithField("signal", sig.String()).Info("Received shutdown signal")
 }
 
+// Run starts the kernel, waits for shutdown signal, then stops gracefully.
 func (k *Kernel) Run() error {
 	ctx := context.Background()
 

@@ -1,11 +1,26 @@
 package handler
 
-import "go-inventory-reservations/internal/logger"
+import (
+	"go-inventory-reservations/internal/logger"
+	"go-inventory-reservations/internal/service"
+)
 
-type Handlers struct {
-	Logger *logger.Logger
+// HandlersPool represents a collection of handlers
+type HandlersPool struct {
+	Stock       *StockHandler
+	Reservation *ReservationHandler
+	Admin       *AdminHandler
 }
 
-func NewHandlers(logger *logger.Logger) *Handlers {
-	return &Handlers{Logger: logger}
+// NewHandlersPool creates a new HandlersPool instance
+func NewHandlersPool(
+	stockService service.StockServiceInterface,
+	reservationService service.ReservationServiceInterface,
+	logger *logger.Logger,
+) *HandlersPool {
+	return &HandlersPool{
+		Stock:       NewStockHandler(stockService, logger),
+		Reservation: NewReservationHandler(reservationService, logger),
+		Admin:       NewAdminHandler(stockService, logger),
+	}
 }

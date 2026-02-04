@@ -5,9 +5,9 @@ import (
 	"go-inventory-reservations/internal/handler"
 )
 
-func setupAdminRoutes(engine *gin.Engine, handlers handler.Handlers) {
+func setupAdminRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
 	admin := engine.Group("/admin")
-	admin.POST("/stock", handlers.CreateStock)
-	admin.PUT("/stock", handlers.UpdateStock)
-	admin.DELETE("/stock", handlers.DeleteStock)
+	admin.POST("/stock", handlersPool.Admin.CreateStock)
+	admin.PUT("/stock", handlersPool.Admin.UpdateStock)
+	admin.DELETE("/stock/:sku", handlersPool.Admin.DeleteStock)
 }
