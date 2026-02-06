@@ -6,7 +6,7 @@ import (
 )
 
 func setupStockRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
-	admin := engine.Group("/stock")
-	admin.GET("/:sku", handlersPool.Stock.GetStockBySku)
-	admin.GET("/", handlersPool.Stock.GetStocks) // use limit and offset query params
+	stock := engine.Group("/stock")
+	stock.GET("/:sku", handlersPool.Stock.GetStockBySku)
+	stock.GET("/", handlersPool.Stock.GetStocks) // use limit and offset query params
 }

@@ -7,7 +7,6 @@ import (
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/service"
 	"net/http"
-	"os"
 )
 
 // AdminHandler handles all admin-related routes, e.g. stock management, etc.
@@ -68,8 +67,6 @@ func (ah *AdminHandler) UpdateStock(ctx *gin.Context) {
 
 // DeleteStock deletes a stock item by SKU.
 func (ah *AdminHandler) DeleteStock(ctx *gin.Context) {
-
-	os.Exit(1)
 	sku := ctx.Param("sku")
 	if sku == "" {
 		ctx.JSON(http.StatusBadRequest, gin.H{

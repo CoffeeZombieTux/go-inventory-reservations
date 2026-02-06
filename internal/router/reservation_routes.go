@@ -6,15 +6,14 @@ import (
 )
 
 func setupReservationRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
-	admin := engine.Group("/reservation")
-	admin.POST("/reservation", handlersPool.Reservation.CreateReservation)
-	admin.PUT("/reservation", handlersPool.Reservation.UpdateReservation)
-	admin.GET("/reservation/:id", handlersPool.Reservation.GetReservation)
-	admin.GET("/reservation/quote/:quote_id", handlersPool.Reservation.GetReservationByQuoteId)
-	admin.GET("/reservation/order/:order_id", handlersPool.Reservation.GetReservationByOrderId)
-	admin.DELETE("/reservation/:id", handlersPool.Reservation.DeleteReservation)
-	admin.GET("/reservation/:id/commit", handlersPool.Reservation.CommitReservation)
-	admin.POST("/reservation/:id/attach", handlersPool.Reservation.Attach)
-	admin.GET("/reservation/:id/availability", handlersPool.Reservation.GetReservationAvailability)
-
+	reservation := engine.Group("/reservation")
+	reservation.POST("", handlersPool.Reservation.CreateReservation)
+	reservation.PUT("", handlersPool.Reservation.UpdateReservation)
+	reservation.GET("/:id", handlersPool.Reservation.GetReservationById)
+	reservation.GET("/quote/:quote_id", handlersPool.Reservation.GetReservationByQuoteId)
+	reservation.GET("/order/:order_id", handlersPool.Reservation.GetReservationByOrderId)
+	reservation.DELETE("/:id", handlersPool.Reservation.DeleteReservation)
+	reservation.GET("/:id/commit", handlersPool.Reservation.CommitReservation)
+	reservation.POST("/:id/attach", handlersPool.Reservation.Attach)
+	reservation.GET("/:id/availability", handlersPool.Reservation.GetReservationAvailability)
 }
