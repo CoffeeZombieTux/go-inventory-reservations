@@ -26,16 +26,19 @@ type StockServiceInterface interface {
 	DeleteStock(ctx context.Context, sku string) error
 }
 
+// StockService is a service for stock management.
 type StockService struct {
 	repo repository.StockRepositoryInterface
 }
 
+// NewStockService creates a new StockService instance.
 func NewStockService(repo repository.StockRepositoryInterface) StockServiceInterface {
 	return &StockService{
 		repo: repo,
 	}
 }
 
+// CreateStock creates a new stock item.
 func (ss *StockService) CreateStock(ctx context.Context, req apimodel.StockRequest) (*model.Stock, error) {
 	stock := &model.Stock{SKU: req.SKU, OnHand: req.Quantity}
 	res, err := ss.repo.Save(ctx, stock)
@@ -45,10 +48,12 @@ func (ss *StockService) CreateStock(ctx context.Context, req apimodel.StockReque
 	return res, nil
 }
 
+// GetStockBySku returns a stock item by its SKU.
 func (ss *StockService) GetStockBySku(ctx context.Context, sku string) (*model.Stock, error) {
 	return ss.repo.GetBySku(ctx, sku)
 }
 
+// GetStocks returns a list of stock items.
 func (ss *StockService) GetStocks(
 	ctx context.Context,
 	requestedLimit,
@@ -97,10 +102,12 @@ func (ss *StockService) GetStocks(
 	return stocks, pagination, message, nil
 }
 
+// AdjustInventory updates the stock quantity for a given SKU.
 func (ss *StockService) AdjustInventory(ctx context.Context, req apimodel.StockRequest) (*model.Stock, error) {
 	return ss.repo.UpdateQuantity(ctx, req.SKU, req.Quantity)
 }
 
+// DeleteStock deletes a stock item by SKU.
 func (ss *StockService) DeleteStock(ctx context.Context, sku string) error {
 	return ss.repo.Delete(ctx, sku)
 }

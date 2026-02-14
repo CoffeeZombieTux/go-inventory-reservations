@@ -2,6 +2,7 @@ package router
 
 import "github.com/gin-gonic/gin"
 
+// setupAppHealthRoutes sets up the health check routes
 func setupAppHealthRoutes(engine *gin.Engine) {
 	engine.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{

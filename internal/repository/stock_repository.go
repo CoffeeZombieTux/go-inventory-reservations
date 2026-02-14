@@ -19,16 +19,19 @@ type StockRepositoryInterface interface {
 	Count(ctx context.Context) (int, error)
 }
 
+// StockRepository is a repository for stock management.
 type StockRepository struct {
 	db *sql.DB
 }
 
+// NewStockRepository creates a new StockRepository instance.
 func NewStockRepository(db *sql.DB) StockRepositoryInterface {
 	return &StockRepository{
 		db: db,
 	}
 }
 
+// GetBySku returns a stock by its SKU.
 func (sr *StockRepository) GetBySku(ctx context.Context, sku string) (*model.Stock, error) {
 	query := `
         SELECT sku, on_hand, reserved, updated_at
@@ -59,6 +62,7 @@ func (sr *StockRepository) GetBySku(ctx context.Context, sku string) (*model.Sto
 	return &stock, nil
 }
 
+// GetStocks returns a list of stocks.
 func (sr *StockRepository) GetStocks(ctx context.Context, limit, offset int) ([]*model.Stock, error) {
 	query := `
         SELECT sku, on_hand, reserved, updated_at
@@ -94,6 +98,7 @@ func (sr *StockRepository) GetStocks(ctx context.Context, limit, offset int) ([]
 	return stocks, nil
 }
 
+// Save inserts a stock into the database or updates it if it already exists.
 func (sr *StockRepository) Save(ctx context.Context, stock *model.Stock) (*model.Stock, error) {
 	query := `
 		INSERT INTO stock (
@@ -121,6 +126,7 @@ func (sr *StockRepository) Save(ctx context.Context, stock *model.Stock) (*model
 	return stock, nil
 }
 
+// UpdateQuantity updates the stock quantity for a given SKU.
 func (sr *StockRepository) UpdateQuantity(ctx context.Context, sku string, onHand int) (*model.Stock, error) {
 	query := `
         UPDATE stock
@@ -148,6 +154,7 @@ func (sr *StockRepository) UpdateQuantity(ctx context.Context, sku string, onHan
 	return &stock, nil
 }
 
+// Delete deletes a stock by its SKU.
 func (sr *StockRepository) Delete(ctx context.Context, sku string) error {
 	query := `DELETE FROM stock WHERE sku = $1 RETURNING sku`
 
@@ -164,6 +171,7 @@ func (sr *StockRepository) Delete(ctx context.Context, sku string) error {
 	return nil
 }
 
+// Count returns the number of stocks records in the database.
 func (sr *StockRepository) Count(ctx context.Context) (int, error) {
 	var count int
 	query := "SELECT COUNT(*) FROM stock"

@@ -8,11 +8,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Database represents a database connection
 type Database struct {
 	DB     *sql.DB
 	logger *logrus.Logger
 }
 
+// New creates a new Database instance
 func New(dsn string, logger *logrus.Logger) (*Database, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
@@ -31,6 +33,7 @@ func New(dsn string, logger *logrus.Logger) (*Database, error) {
 	}, nil
 }
 
+// Close closes the database connection
 func (d *Database) Close() error {
 	if d.DB != nil {
 		d.logger.Info("Closing database connection")
@@ -39,10 +42,12 @@ func (d *Database) Close() error {
 	return nil
 }
 
+// Ping checks if the database connection is alive
 func (d *Database) Ping() error {
 	return d.DB.Ping()
 }
 
+// HealthCheck runs a simple query to check if the database connection is alive
 func (d *Database) HealthCheck() error {
 	var result int
 	err := d.DB.QueryRow("SELECT 1").Scan(&result)

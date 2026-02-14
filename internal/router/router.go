@@ -5,6 +5,7 @@ import (
 	"go-inventory-reservations/internal/handler"
 )
 
+// SetupRoutes sets up the application routes
 func SetupRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
 	setupAppHealthRoutes(engine)
 	setupAdminRoutes(engine, handlersPool)
