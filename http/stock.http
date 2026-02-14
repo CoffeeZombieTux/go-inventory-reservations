@@ -3,7 +3,7 @@ POST http://localhost:8080/admin/stock
 Content-Type: application/json
 
 {
-  "sku": "127",
+  "sku": "{{sku1}}",
   "qty": 1
 }
 
@@ -12,20 +12,20 @@ PUT http://localhost:8080/admin/stock
 Content-Type: application/json
 
 {
-  "sku": "127",
+  "sku": "{{sku1}}",
   "qty": 2
 }
 
 ### Delete stock record
-DELETE http://localhost:8080/admin/stock/127
+DELETE http://localhost:8080/admin/stock/{{sku1}}
 Content-Type: application/json
 
 ### Get Stock by sku
-GET http://localhost:8080/stock/127
+GET http://localhost:8080/stock/{{sku1}}
 Content-Type: application/json
 
 ### Get Stocks with pagination
-GET http://localhost:8080/stock?limit=2&offset=2
+GET http://localhost:8080/stock?limit=5&offset=2
 Content-Type: application/json
 
 ### Get Stocks with pagination default values limit=50&offset=0

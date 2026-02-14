@@ -3,69 +3,230 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"github.com/google/uuid"
 	"go-inventory-reservations/internal/model"
+	"strings"
 	"time"
 )
 
-// ReservationRepository defines operations for reservation management
+// ReservationRepositoryInterface defines operations for reservation management
 type ReservationRepositoryInterface interface {
-	Create(ctx context.Context, reservation *model.Reservation, items []*model.ReservationItem) error
-	GetByID(ctx context.Context, id uuid.UUID) (*model.Reservation, error)
-	GetByQuoteID(ctx context.Context, quoteID string) (*model.Reservation, error)
-	GetByOrderID(ctx context.Context, orderID string) (*model.Reservation, error)
-	GetItems(ctx context.Context, reservationID uuid.UUID) ([]*model.ReservationItem, error)
-	UpdateStatus(ctx context.Context, id uuid.UUID, status string, version int) error
-	UpdateOrderID(ctx context.Context, id uuid.UUID, orderID string, version int) error
-	ListExpired(ctx context.Context, before time.Time) ([]*model.Reservation, error)
+	Save(ctx context.Context, reservation *model.Reservation) (*model.Reservation, error)
+	GetById(ctx context.Context, id uuid.UUID) (*model.Reservation, error)
+	GetByQuoteId(ctx context.Context, quoteId string) (*model.Reservation, error)
+	GetByOrderId(ctx context.Context, orderId string) (*model.Reservation, error)
+	SelectReservationsByQuery(ctx context.Context, query ReservationsQuery, limit int) ([]*model.Reservation, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
+// ReservationRepository is a repository for reservation management.
 type ReservationRepository struct {
 	db *sql.DB
 }
 
-func (r ReservationRepository) Create(ctx context.Context, reservation *model.Reservation, items []*model.ReservationItem) error {
-	//TODO implement me
-	panic("implement me")
+// NewReservationRepository creates a new ReservationRepository instance.
+func NewReservationRepository(db *sql.DB) *ReservationRepository {
+	return &ReservationRepository{db: db}
 }
 
-func (r ReservationRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Reservation, error) {
-	//TODO implement me
-	panic("implement me")
+type ReservationsQuery struct {
+	ExpiresAtGte *time.Time
+	Statuses     []string
+	UpdatedAtLt  *time.Time
 }
 
-func (r ReservationRepository) GetByQuoteID(ctx context.Context, quoteID string) (*model.Reservation, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r ReservationRepository) GetByOrderID(ctx context.Context, orderID string) (*model.Reservation, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r ReservationRepository) GetItems(ctx context.Context, reservationID uuid.UUID) ([]*model.ReservationItem, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r ReservationRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, version int) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r ReservationRepository) UpdateOrderID(ctx context.Context, id uuid.UUID, orderID string, version int) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r ReservationRepository) ListExpired(ctx context.Context, before time.Time) ([]*model.Reservation, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func NewReservationRepository(db *sql.DB) ReservationRepositoryInterface {
-	return &ReservationRepository{
-		db: db,
+// Save inserts a reservation into the database or updates it if it already exists.
+func (r *ReservationRepository) Save(
+	ctx context.Context,
+	reservation *model.Reservation,
+) (*model.Reservation, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
 	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Insert reservation (assuming id is UUID)
+	queryRes := `
+		INSERT INTO reservations (reservation_id, status, quote_id, order_id, expires_at, items_hash, version)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (reservation_id)
+		DO UPDATE SET
+			status = EXCLUDED.status,
+			quote_id = EXCLUDED.quote_id,
+			order_id = EXCLUDED.order_id,
+			expires_at = EXCLUDED.expires_at,
+			items_hash = EXCLUDED.items_hash,
+			version = EXCLUDED.version,
+			updated_at = NOW()
+		RETURNING reservation_id, created_at, updated_at
+	`
+	err = tx.QueryRowContext(
+		ctx,
+		queryRes,
+		reservation.ReservationId,
+		reservation.Status,
+		reservation.QuoteId,
+		reservation.OrderId,
+		reservation.ExpiresAt,
+		reservation.ItemsHash,
+		reservation.Version,
+	).Scan(&reservation.ReservationId, &reservation.CreatedAt, &reservation.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("save reservation: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return reservation, nil
+}
+
+// GetById returns a reservation by its reservationID.
+func (r *ReservationRepository) GetById(ctx context.Context, id uuid.UUID) (*model.Reservation, error) {
+	query := `SELECT * FROM reservations WHERE reservation_id = $1`
+	res, err := r.getReservation(ctx, query, id)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation by id: %w", err)
+	}
+	return res, nil
+}
+
+// GetByQuoteId returns a reservation by its quoteID.
+func (r *ReservationRepository) GetByQuoteId(ctx context.Context, quoteId string) (*model.Reservation, error) {
+	query := `SELECT * FROM reservations WHERE quote_id = $1`
+	res, err := r.getReservation(ctx, query, quoteId)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation by quote_id failed with error: %w", err)
+	}
+	return res, nil
+}
+
+// GetByOrderId returns a reservation by its orderID.
+func (r *ReservationRepository) GetByOrderId(ctx context.Context, orderId string) (*model.Reservation, error) {
+	query := `SELECT * FROM reservations WHERE order_id = $1`
+	res, err := r.getReservation(ctx, query, orderId)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation by order_id failed with error: %w", err)
+	}
+	return res, nil
+}
+
+// Delete deletes a reservation by its reservationID.
+func (r *ReservationRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM reservations WHERE reservation_id = $1`
+	res, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete reservation by id: %w", err)
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("delete reservation by id: %w", err)
+	}
+	if affected == 0 {
+		return fmt.Errorf("reservation not found with id: %s", id)
+	}
+	return nil
+}
+
+// SelectReservationsByQuery returns a list of reservations that match the given query.
+// Helper function for crons
+func (r *ReservationRepository) SelectReservationsByQuery(
+	ctx context.Context,
+	query ReservationsQuery,
+	limit int,
+) ([]*model.Reservation, error) {
+	sql := `SELECT * FROM reservations`
+	var where []string
+	var args []interface{}
+	argPos := 1
+
+	if query.ExpiresAtGte != nil {
+		where = append(where, fmt.Sprintf("expires_at <= $%d", argPos))
+		args = append(args, *query.ExpiresAtGte)
+		argPos++
+		fmt.Printf("ExpiresAtGte: %v\n", *query.ExpiresAtGte)
+	}
+	if query.UpdatedAtLt != nil {
+		where = append(where, fmt.Sprintf("updated_at < $%d", argPos))
+		args = append(args, *query.UpdatedAtLt)
+		argPos++
+	}
+	if len(query.Statuses) > 0 {
+		placeholders := make([]string, len(query.Statuses))
+		for i, status := range query.Statuses {
+			placeholders[i] = fmt.Sprintf("$%d", argPos)
+			args = append(args, status)
+			argPos++
+		}
+		where = append(where, fmt.Sprintf("status IN (%s)", strings.Join(placeholders, ",")))
+	}
+
+	if len(where) > 0 {
+		sql += " WHERE " + strings.Join(where, " AND ")
+	}
+	sql += fmt.Sprintf(" ORDER BY updated_at ASC LIMIT %d", limit)
+
+	rows, err := r.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reservations []*model.Reservation
+	for rows.Next() {
+		var res model.Reservation
+		if err := rows.Scan(
+			&res.ReservationId,
+			&res.Status,
+			&res.QuoteId,
+			&res.OrderId,
+			&res.ExpiresAt,
+			&res.CreatedAt,
+			&res.UpdatedAt,
+			&res.ItemsHash,
+			&res.Version,
+		); err != nil {
+			return nil, err
+		}
+		reservations = append(reservations, &res)
+	}
+	return reservations, rows.Err()
+}
+
+// getReservation returns a reservation by the given query.
+func (r *ReservationRepository) getReservation(
+	ctx context.Context,
+	query string,
+	args ...any,
+) (*model.Reservation, error) {
+	row := r.db.QueryRowContext(ctx, query, args...)
+	res := &model.Reservation{}
+	err := row.Scan(
+		&res.ReservationId,
+		&res.Status,
+		&res.QuoteId,
+		&res.OrderId,
+		&res.ExpiresAt,
+		&res.CreatedAt,
+		&res.UpdatedAt,
+		&res.ItemsHash,
+		&res.Version,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("no reservation found with query: %w", query) // Not found
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan reservation: %w", err)
+	}
+
+	return res, nil
 }

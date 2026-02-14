@@ -1,0 +1,87 @@
+@quoteId = 001
+@orderId = 1
+
+### Create reservation
+POST {{host}}/reservation
+Content-Type: application/json
+
+{
+  "quote_id": "{{quoteId}}",
+  "items": [
+    {
+      "sku": "{{sku1}}",
+      "qty": 1
+    }
+  ]
+}
+
+> {%
+    // JavaScript code to save the reservationId from the response body
+    client.global.set("reservationId", response.body.reservation_id);
+%}
+
+
+### Update reservation
+PUT http://localhost:8080/reservation
+Content-Type: application/json
+
+{
+  "reservation_id": "{{reservationId}}",
+  "quote_id": "{{quoteId}}",
+  "items": [
+    {
+      "sku": "{{sku1}}",
+      "qty": 3
+    }
+  ]
+}
+
+### Get reservation by id
+GET http://localhost:8080/reservation/{{reservationId}}
+
+### Get reservation by quote id
+GET http://localhost:8080/reservation/quote/{{quoteId}}
+
+> {%
+    // JavaScript code to save the reservationId from the response body
+    client.global.set("reservationId", response.body.reservation_id);
+%}
+
+
+### Get reservation by order id
+GET http://localhost:8080/reservation/order/{{orderId}}
+
+> {%
+    // JavaScript code to save the reservationId from the response body
+    client.global.set("reservationId", response.body.reservation_id);
+%}
+
+### Attach Order to reservation
+POST http://localhost:8080/reservation/attach-order
+Content-Type: application/json
+
+{
+  "reservation_id": "{{reservationId}}",
+  "order_id": "{{orderId}}"
+}
+
+### Commit reservation by id
+POST http://localhost:8080/reservation/commit
+Content-Type: application/json
+
+{
+  "reservation_id": "{{reservationId}}",
+  "order_id": "{{orderId}}"
+}
+
+### Release reservation by id
+GET http://localhost:8080/reservation/{{reservationId}}/release
+
+### Revert reservation
+POST http://localhost:8080/reservation/revert
+Content-Type: application/json
+
+{
+  "reservation_id": "{{reservationId}}",
+  "order_id": "{{orderId}}"
+}

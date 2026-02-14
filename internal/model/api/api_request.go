@@ -1,15 +1,20 @@
 package api_model
 
+import "github.com/google/uuid"
+
+// StockRequest represents a request to reserve stock items
 type StockRequest struct {
 	SKU      string `json:"sku" binding:"required"`
 	Quantity int    `json:"qty" binding:"required,gte=0"`
 }
 
+// PaginationParams represents pagination parameters for a request
 type PaginationParams struct {
 	Limit  int
 	Offset int
 }
 
+// NewPaginationParams creates a new PaginationParams instance
 func NewPaginationParams(requestedLimit, requestedOffset int) PaginationParams {
 	const (
 		DefaultLimit = 50
@@ -37,4 +42,35 @@ func NewPaginationParams(requestedLimit, requestedOffset int) PaginationParams {
 		Limit:  limit,
 		Offset: offset,
 	}
+}
+
+// CreateReservationRequest represents a request to create a reservation
+type CreateReservationRequest struct {
+	QuoteId string         `json:"quote_id" binding:"required"`
+	Items   []StockRequest `json:"items" binding:"required,gt=0"`
+}
+
+// UpdateReservationRequest represents a request to update a reservation
+type UpdateReservationRequest struct {
+	ReservationId *uuid.UUID     `json:"reservation_id" binding:"required"`
+	QuoteId       string         `json:"quote_id" binding:"required"`
+	Items         []StockRequest `json:"items" binding:"required,gt=0"`
+}
+
+// CommitReservationRequest represents a request to commit a reservation
+type CommitReservationRequest struct {
+	ReservationId *uuid.UUID `json:"reservation_id" binding:"required"`
+	OrderId       string     `json:"order_id" binding:"required"`
+}
+
+// AttachOrderRequest represents a request to attach an order to a reservation
+type AttachOrderRequest struct {
+	ReservationId *uuid.UUID `json:"reservation_id" binding:"required"`
+	OrderId       string     `json:"order_id" binding:"required"`
+}
+
+// RevertReservationRequest represents a request to revert a reservation
+type RevertReservationRequest struct {
+	ReservationId *uuid.UUID `json:"reservation_id" binding:"required"`
+	OrderId       string     `json:"order_id" binding:"required"`
 }

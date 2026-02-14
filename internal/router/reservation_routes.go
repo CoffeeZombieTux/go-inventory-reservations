@@ -5,6 +5,7 @@ import (
 	"go-inventory-reservations/internal/handler"
 )
 
+// setupReservationRoutes sets up the reservation routes
 func setupReservationRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
 	reservation := engine.Group("/reservation")
 	reservation.POST("", handlersPool.Reservation.CreateReservation)
@@ -12,8 +13,8 @@ func setupReservationRoutes(engine *gin.Engine, handlersPool handler.HandlersPoo
 	reservation.GET("/:id", handlersPool.Reservation.GetReservationById)
 	reservation.GET("/quote/:quote_id", handlersPool.Reservation.GetReservationByQuoteId)
 	reservation.GET("/order/:order_id", handlersPool.Reservation.GetReservationByOrderId)
-	reservation.DELETE("/:id", handlersPool.Reservation.DeleteReservation)
-	reservation.GET("/:id/commit", handlersPool.Reservation.CommitReservation)
-	reservation.POST("/:id/attach", handlersPool.Reservation.Attach)
-	reservation.GET("/:id/availability", handlersPool.Reservation.GetReservationAvailability)
+	reservation.POST("/attach-order", handlersPool.Reservation.AttachOrder)
+	reservation.POST("/commit", handlersPool.Reservation.CommitReservation)
+	reservation.GET("/:id/release", handlersPool.Reservation.ReleaseReservation)
+	reservation.POST("/revert", handlersPool.Reservation.Revert)
 }

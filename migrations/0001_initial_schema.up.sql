@@ -10,10 +10,10 @@ CREATE TABLE stock (
 
 CREATE TABLE reservations (
     reservation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status TEXT NOT NULL CHECK (status IN ('PENDING','COMMITTED','RELEASED','EXPIRED')),
+    status TEXT NOT NULL CHECK (status IN ('PENDING','COMMITTED','RELEASED','EXPIRED','RESERVED','REVERTED')),
     quote_id TEXT UNIQUE,
     order_id TEXT UNIQUE,
-    expires_at timestamptz NOT NULL,
+    expires_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     items_hash TEXT,

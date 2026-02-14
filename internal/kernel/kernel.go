@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	cronlib "github.com/robfig/cron/v3"
 	"go-inventory-reservations/internal/config"
+	"go-inventory-reservations/internal/cron"
 	"go-inventory-reservations/internal/database"
 	"go-inventory-reservations/internal/handler"
 	"go-inventory-reservations/internal/logger"
@@ -26,6 +28,7 @@ type Kernel struct {
 	DBConnection *database.Database
 	Router       *gin.Engine
 	HTTPServer   *http.Server
+	Cron         *cronlib.Cron
 }
 
 // New creates and initializes a new Kernel instance.
@@ -51,7 +54,7 @@ func New() (*Kernel, error) {
 
 	// Services
 	stockService := service.NewStockService(stockRepo)
-	reservationService := service.NewReservationService(reservationRepo)
+	reservationService := service.NewReservationService(reservationRepo, cfg)
 
 	// Handlers (with all required services)
 	handlersPool := handler.NewHandlersPool(stockService, reservationService, log)
@@ -66,12 +69,15 @@ func New() (*Kernel, error) {
 		Handler: routerEngine,
 	}
 
+	c := cron.InitCrons(reservationService, log, cfg)
+
 	kernel := &Kernel{
 		Config:       cfg,
 		Logger:       log,
 		DBConnection: db,
 		Router:       routerEngine,
 		HTTPServer:   httpServer,
+		Cron:         c,
 	}
 
 	log.Info("Kernel initialized successfully")
@@ -94,6 +100,7 @@ func (k *Kernel) Start(ctx context.Context) error {
 		}
 	}()
 
+	k.Cron.Start()
 	k.Logger.Info("Kernel started successfully")
 	return nil
 }
@@ -101,6 +108,9 @@ func (k *Kernel) Start(ctx context.Context) error {
 // Stop gracefully shuts down the HTTP server and closes the database connection.
 func (k *Kernel) Stop(ctx context.Context) error {
 	k.Logger.Info("Stopping kernel...")
+	if k.Cron != nil {
+		k.Cron.Stop()
+	}
 
 	// Graceful server shutdown with timeout
 	ctxShutdown, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -129,7 +139,7 @@ func (k *Kernel) WaitForShutdown() {
 	k.Logger.WithField("signal", sig.String()).Info("Received shutdown signal")
 }
 
-// Run starts the kernel, waits for shutdown signal, then stops gracefully.
+// Run starts the kernel, waits for a shutdown signal, then stops gracefully.
 func (k *Kernel) Run() error {
 	ctx := context.Background()
 
