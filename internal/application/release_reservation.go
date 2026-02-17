@@ -1,0 +1,73 @@
+package application
+
+import (
+	"context"
+	"github.com/google/uuid"
+	apimodel "go-inventory-reservations/internal/model/api"
+)
+
+// ReleaseReservation orchestrates the process of releasing a reservation.
+// It updates the stock inventory and updates the reservation status.
+// It also deletes the reservation items.
+func (ro *ReservationOrchestrator) ReleaseReservation(ctx context.Context, id uuid.UUID) error {
+	reservation, err := ro.reservationService.GetReservationById(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	unit, err := ro.uowManager.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			unit.Rollback()
+		}
+	}()
+
+	// Get reservation items
+	reservedItems, err := ro.reservationItemService.GetReservationItems(ctx, reservation.ReservationId, unit)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range reservedItems {
+		// Get stock for item
+		stock, err := ro.stockService.GetStockBySku(ctx, item.SKU)
+		if err != nil {
+			return err
+		}
+
+		// Adjust stock inventory
+		finalReserved := stock.Reserved - item.Qty
+		req := apimodel.StockRequest{
+			SKU:      stock.SKU,
+			OnHand:   nil,
+			Reserved: &finalReserved,
+		}
+
+		// Save stock inventory
+		_, err = ro.stockService.AdjustInventory(ctx, req, unit)
+		if err != nil {
+			return err
+		}
+
+		// Delete reservation item
+		err = ro.reservationItemService.DeleteReservationItem(ctx, reservation.ReservationId, item.SKU, unit)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Update reservation status
+	err = ro.reservationService.ReleaseReservation(ctx, id, unit)
+	if err != nil {
+		return err
+	}
+
+	err = unit.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}

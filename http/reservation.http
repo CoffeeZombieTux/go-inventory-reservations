@@ -10,14 +10,14 @@ Content-Type: application/json
   "items": [
     {
       "sku": "{{sku1}}",
-      "qty": 1
+      "qty": 2
     }
   ]
 }
 
 > {%
     // JavaScript code to save the reservationId from the response body
-    client.global.set("reservationId", response.body.reservation_id);
+    client.global.set("reservationId", response.body.reservation.reservation_id);
 %}
 
 
@@ -31,7 +31,11 @@ Content-Type: application/json
   "items": [
     {
       "sku": "{{sku1}}",
-      "qty": 3
+      "qty": 5
+    },
+    {
+      "sku": "{{sku2}}",
+      "qty": 2
     }
   ]
 }
@@ -44,7 +48,7 @@ GET http://localhost:8080/reservation/quote/{{quoteId}}
 
 > {%
     // JavaScript code to save the reservationId from the response body
-    client.global.set("reservationId", response.body.reservation_id);
+    client.global.set("reservationId", response.body.reservation.reservation_id);
 %}
 
 
@@ -53,7 +57,7 @@ GET http://localhost:8080/reservation/order/{{orderId}}
 
 > {%
     // JavaScript code to save the reservationId from the response body
-    client.global.set("reservationId", response.body.reservation_id);
+    client.global.set("reservationId", response.body.reservation.reservation_id);
 %}
 
 ### Attach Order to reservation

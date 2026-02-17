@@ -6,6 +6,7 @@ import (
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/repository"
+	"go-inventory-reservations/internal/uow"
 )
 
 // StockServiceInterface defines business operations for stock management
@@ -22,8 +23,10 @@ type StockServiceInterface interface {
 		message string,
 		err error,
 	)
-	AdjustInventory(ctx context.Context, req apimodel.StockRequest) (*model.Stock, error)
+	ReserveStock(ctx context.Context, sku string, qty int, uow *uow.UnitOfWork) (*model.Stock, error)
+	AdjustInventory(ctx context.Context, req apimodel.StockRequest, uow *uow.UnitOfWork) (*model.Stock, error)
 	DeleteStock(ctx context.Context, sku string) error
+	CalculateAvailability(ctx context.Context, stock *model.Stock) int
 }
 
 // StockService is a service for stock management.
@@ -40,8 +43,18 @@ func NewStockService(repo repository.StockRepositoryInterface) StockServiceInter
 
 // CreateStock creates a new stock item.
 func (ss *StockService) CreateStock(ctx context.Context, req apimodel.StockRequest) (*model.Stock, error) {
-	stock := &model.Stock{SKU: req.SKU, OnHand: req.Quantity}
-	res, err := ss.repo.Save(ctx, stock)
+	var (
+		onHand   int
+		reserved int
+	)
+	if req.OnHand != nil {
+		onHand = *req.OnHand
+	}
+	if req.Reserved != nil {
+		reserved = *req.Reserved
+	}
+	stock := &model.Stock{SKU: req.SKU, OnHand: onHand, Reserved: reserved}
+	res, err := ss.repo.Create(ctx, stock)
 	if err != nil {
 		return nil, err
 	}
@@ -103,11 +116,30 @@ func (ss *StockService) GetStocks(
 }
 
 // AdjustInventory updates the stock quantity for a given SKU.
-func (ss *StockService) AdjustInventory(ctx context.Context, req apimodel.StockRequest) (*model.Stock, error) {
-	return ss.repo.UpdateQuantity(ctx, req.SKU, req.Quantity)
+func (ss *StockService) AdjustInventory(ctx context.Context, req apimodel.StockRequest, uow *uow.UnitOfWork) (*model.Stock, error) {
+	return ss.repo.Update(ctx, req, uow)
+}
+
+// ReserveStock reserves a given quantity of stock items for a given SKU. Qty can be negative.
+func (ss *StockService) ReserveStock(ctx context.Context, sku string, qty int, uow *uow.UnitOfWork) (*model.Stock, error) {
+	stock, err := ss.GetStockBySku(ctx, sku)
+	if err != nil {
+		return nil, err
+	}
+	newReserved := stock.Reserved + qty
+	req := apimodel.StockRequest{
+		SKU:      sku,
+		Reserved: &newReserved,
+	}
+	return ss.repo.Update(ctx, req, uow)
 }
 
 // DeleteStock deletes a stock item by SKU.
 func (ss *StockService) DeleteStock(ctx context.Context, sku string) error {
 	return ss.repo.Delete(ctx, sku)
+}
+
+// CalculateAvailability calculates the available quantity for a given stock item.
+func (ss *StockService) CalculateAvailability(ctx context.Context, stock *model.Stock) int {
+	return stock.OnHand - stock.Reserved
 }

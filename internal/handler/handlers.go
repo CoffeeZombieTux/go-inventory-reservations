@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"go-inventory-reservations/internal/application"
 	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/service"
 )
@@ -14,13 +15,14 @@ type HandlersPool struct {
 
 // NewHandlersPool creates a new HandlersPool instance
 func NewHandlersPool(
+	reservationOrchestrator application.ReservationOrchestratorInterface,
 	stockService service.StockServiceInterface,
 	reservationService service.ReservationServiceInterface,
 	logger *logger.Logger,
 ) *HandlersPool {
 	return &HandlersPool{
 		Stock:       NewStockHandler(stockService, logger),
-		Reservation: NewReservationHandler(reservationService, logger),
+		Reservation: NewReservationHandler(reservationOrchestrator, reservationService, logger),
 		Admin:       NewAdminHandler(stockService, logger),
 	}
 }

@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go-inventory-reservations/internal/application"
 	"go-inventory-reservations/internal/logger"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/service"
@@ -10,17 +11,23 @@ import (
 	"strings"
 )
 
-// ReservationHandler handles all reservation-related routes, e.g. reservation creation, etc.
+// ReservationHandler handles all reservation-related routes, e.g., reservation creation, etc.
 type ReservationHandler struct {
-	reservationService service.ReservationServiceInterface
-	logger             *logger.Logger
+	reservationOrchestrator application.ReservationOrchestratorInterface
+	reservationService      service.ReservationServiceInterface
+	logger                  *logger.Logger
 }
 
 // NewReservationHandler creates a new ReservationHandler instance.
-func NewReservationHandler(reservationService service.ReservationServiceInterface, logger *logger.Logger) *ReservationHandler {
+func NewReservationHandler(
+	reservationOrchestrator application.ReservationOrchestratorInterface,
+	reservationService service.ReservationServiceInterface,
+	logger *logger.Logger,
+) *ReservationHandler {
 	return &ReservationHandler{
-		reservationService: reservationService,
-		logger:             logger,
+		reservationOrchestrator: reservationOrchestrator,
+		reservationService:      reservationService,
+		logger:                  logger,
 	}
 }
 
@@ -35,7 +42,7 @@ func (rh *ReservationHandler) CreateReservation(ctx *gin.Context) {
 		return
 	}
 
-	reservation, err := rh.reservationService.CreateReservation(ctx, req)
+	reservation, err := rh.reservationOrchestrator.CreateReservation(ctx, req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create reservation: " + err.Error(),
@@ -57,7 +64,7 @@ func (rh *ReservationHandler) UpdateReservation(ctx *gin.Context) {
 		return
 	}
 
-	reservation, err := rh.reservationService.UpdateReservation(ctx, req)
+	reservation, err := rh.reservationOrchestrator.UpdateReservation(ctx, req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to update reservation: " + err.Error(),
@@ -87,7 +94,7 @@ func (rh *ReservationHandler) GetReservationById(ctx *gin.Context) {
 		return
 	}
 
-	reservation, err := rh.reservationService.GetReservationById(ctx, ReservationId)
+	reservation, err := rh.reservationOrchestrator.GetReservationById(ctx, ReservationId)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{
 			"error": "Reservation not found",
@@ -108,7 +115,7 @@ func (rh *ReservationHandler) GetReservationByQuoteId(ctx *gin.Context) {
 		return
 	}
 
-	reservation, err := rh.reservationService.GetReservationByQuoteId(ctx, quoteId)
+	reservation, err := rh.reservationOrchestrator.GetReservationByQuoteId(ctx, quoteId)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{
 			"error": "Reservation not found",
@@ -129,7 +136,7 @@ func (rh *ReservationHandler) GetReservationByOrderId(ctx *gin.Context) {
 		return
 	}
 
-	reservation, err := rh.reservationService.GetReservationByOrderId(ctx, orderId)
+	reservation, err := rh.reservationOrchestrator.GetReservationByOrderId(ctx, orderId)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{
 			"error": "Reservation not found",
@@ -172,7 +179,7 @@ func (rh *ReservationHandler) CommitReservation(ctx *gin.Context) {
 		return
 	}
 
-	err := rh.reservationService.CommitReservation(ctx, req)
+	_, err := rh.reservationOrchestrator.CommitReservation(ctx, req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to commit reservation: " + err.Error(),
@@ -201,7 +208,7 @@ func (rh *ReservationHandler) ReleaseReservation(ctx *gin.Context) {
 		return
 	}
 
-	err = rh.reservationService.ReleaseReservation(ctx, ReservationId)
+	err = rh.reservationOrchestrator.ReleaseReservation(ctx, ReservationId)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{
 			"error": "Reservation not found or already released. ReservationId: " + idStr,
@@ -222,7 +229,7 @@ func (rh *ReservationHandler) Revert(ctx *gin.Context) {
 		return
 	}
 
-	err := rh.reservationService.RevertReservation(ctx, req)
+	err := rh.reservationOrchestrator.RevertReservation(ctx, req)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to revert reservation: " + err.Error(),

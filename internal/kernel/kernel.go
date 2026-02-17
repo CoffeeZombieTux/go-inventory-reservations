@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	cronlib "github.com/robfig/cron/v3"
+	"go-inventory-reservations/internal/application"
 	"go-inventory-reservations/internal/config"
 	"go-inventory-reservations/internal/cron"
 	"go-inventory-reservations/internal/database"
@@ -13,6 +14,7 @@ import (
 	"go-inventory-reservations/internal/repository"
 	"go-inventory-reservations/internal/router"
 	"go-inventory-reservations/internal/service"
+	"go-inventory-reservations/internal/uow"
 	"net/http"
 	"os"
 	"os/signal"
@@ -49,15 +51,25 @@ func New() (*Kernel, error) {
 	}
 
 	// Repositories
+	unitOfWork := uow.NewUnitOfWorkManager(db.DB)
 	stockRepo := repository.NewStockRepository(db.DB)
 	reservationRepo := repository.NewReservationRepository(db.DB)
+	reservationItemRepo := repository.NewReservationItemsRepository(db.DB)
 
 	// Services
 	stockService := service.NewStockService(stockRepo)
 	reservationService := service.NewReservationService(reservationRepo, cfg)
+	reservationItemService := service.NewReservationItemsService(reservationItemRepo)
+
+	reservationOrchestrator := application.NewReservationOrchestrator(
+		unitOfWork,
+		stockService,
+		reservationService,
+		reservationItemService,
+	)
 
 	// Handlers (with all required services)
-	handlersPool := handler.NewHandlersPool(stockService, reservationService, log)
+	handlersPool := handler.NewHandlersPool(reservationOrchestrator, stockService, reservationService, log)
 
 	// Gin router and HTTP server setup
 	routerEngine := gin.Default()

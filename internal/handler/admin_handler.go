@@ -55,7 +55,7 @@ func (ah *AdminHandler) UpdateStock(ctx *gin.Context) {
 		return
 	}
 
-	stock, err := ah.stockService.AdjustInventory(ctx, req)
+	stock, err := ah.stockService.AdjustInventory(ctx, req, nil)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to update stock qty: " + err.Error(),

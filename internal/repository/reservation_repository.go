@@ -3,20 +3,26 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"go-inventory-reservations/internal/model"
+	apimodel "go-inventory-reservations/internal/model/api"
+	"go-inventory-reservations/internal/uow"
 	"strings"
-	"time"
 )
 
 // ReservationRepositoryInterface defines operations for reservation management
 type ReservationRepositoryInterface interface {
-	Save(ctx context.Context, reservation *model.Reservation) (*model.Reservation, error)
+	Save(ctx context.Context, reservation *model.Reservation, uow *uow.UnitOfWork) (*model.Reservation, error)
 	GetById(ctx context.Context, id uuid.UUID) (*model.Reservation, error)
 	GetByQuoteId(ctx context.Context, quoteId string) (*model.Reservation, error)
 	GetByOrderId(ctx context.Context, orderId string) (*model.Reservation, error)
-	SelectReservationsByQuery(ctx context.Context, query ReservationsQuery, limit int) ([]*model.Reservation, error)
+	SelectReservationsByQuery(
+		ctx context.Context,
+		query apimodel.ReservationsQuery,
+		limit int,
+	) ([]*model.Reservation, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -30,26 +36,18 @@ func NewReservationRepository(db *sql.DB) *ReservationRepository {
 	return &ReservationRepository{db: db}
 }
 
-type ReservationsQuery struct {
-	ExpiresAtGte *time.Time
-	Statuses     []string
-	UpdatedAtLt  *time.Time
-}
-
 // Save inserts a reservation into the database or updates it if it already exists.
 func (r *ReservationRepository) Save(
 	ctx context.Context,
 	reservation *model.Reservation,
+	uow *uow.UnitOfWork,
 ) (*model.Reservation, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
+	var exec SQLExecutor
+	if uow != nil && uow.GetTransaction() != nil {
+		exec = uow.GetTransaction()
+	} else {
+		exec = r.db
 	}
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
 
 	// Insert reservation (assuming id is UUID)
 	queryRes := `
@@ -66,7 +64,7 @@ func (r *ReservationRepository) Save(
 			updated_at = NOW()
 		RETURNING reservation_id, created_at, updated_at
 	`
-	err = tx.QueryRowContext(
+	err := exec.QueryRowContext(
 		ctx,
 		queryRes,
 		reservation.ReservationId,
@@ -79,10 +77,6 @@ func (r *ReservationRepository) Save(
 	).Scan(&reservation.ReservationId, &reservation.CreatedAt, &reservation.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("save reservation: %w", err)
-	}
-
-	if err = tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit tx: %w", err)
 	}
 
 	return reservation, nil
@@ -140,7 +134,7 @@ func (r *ReservationRepository) Delete(ctx context.Context, id uuid.UUID) error 
 // Helper function for crons
 func (r *ReservationRepository) SelectReservationsByQuery(
 	ctx context.Context,
-	query ReservationsQuery,
+	query apimodel.ReservationsQuery,
 	limit int,
 ) ([]*model.Reservation, error) {
 	sql := `SELECT * FROM reservations`
@@ -220,7 +214,7 @@ func (r *ReservationRepository) getReservation(
 		&res.ItemsHash,
 		&res.Version,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("no reservation found with query: %w", query) // Not found
 	}
 

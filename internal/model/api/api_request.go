@@ -1,11 +1,15 @@
 package api_model
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+	"time"
+)
 
 // StockRequest represents a request to reserve stock items
 type StockRequest struct {
 	SKU      string `json:"sku" binding:"required"`
-	Quantity int    `json:"qty" binding:"required,gte=0"`
+	OnHand   *int   `json:"on_hand"`
+	Reserved *int   `json:"reserved"`
 }
 
 // PaginationParams represents pagination parameters for a request
@@ -46,15 +50,21 @@ func NewPaginationParams(requestedLimit, requestedOffset int) PaginationParams {
 
 // CreateReservationRequest represents a request to create a reservation
 type CreateReservationRequest struct {
-	QuoteId string         `json:"quote_id" binding:"required"`
-	Items   []StockRequest `json:"items" binding:"required,gt=0"`
+	QuoteId string                   `json:"quote_id" binding:"required"`
+	Items   []ReservationItemRequest `json:"items" binding:"required,gt=0"`
+}
+
+// ReservationItemRequest represents a request to reserve a single item
+type ReservationItemRequest struct {
+	SKU      string `json:"sku" binding:"required"`
+	Quantity int    `json:"qty" binding:"required,gte=0"`
 }
 
 // UpdateReservationRequest represents a request to update a reservation
 type UpdateReservationRequest struct {
-	ReservationId *uuid.UUID     `json:"reservation_id" binding:"required"`
-	QuoteId       string         `json:"quote_id" binding:"required"`
-	Items         []StockRequest `json:"items" binding:"required,gt=0"`
+	ReservationId *uuid.UUID               `json:"reservation_id" binding:"required"`
+	QuoteId       string                   `json:"quote_id" binding:"required"`
+	Items         []ReservationItemRequest `json:"items" binding:"required,gt=0"`
 }
 
 // CommitReservationRequest represents a request to commit a reservation
@@ -73,4 +83,11 @@ type AttachOrderRequest struct {
 type RevertReservationRequest struct {
 	ReservationId *uuid.UUID `json:"reservation_id" binding:"required"`
 	OrderId       string     `json:"order_id" binding:"required"`
+}
+
+// ReservationsQuery represents a query to retrieve reservations
+type ReservationsQuery struct {
+	ExpiresAtGte *time.Time
+	Statuses     []string
+	UpdatedAtLt  *time.Time
 }

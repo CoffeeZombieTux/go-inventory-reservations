@@ -8,6 +8,7 @@ import (
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/repository"
+	"go-inventory-reservations/internal/uow"
 	"time"
 )
 
@@ -23,15 +24,15 @@ const statusReverted = "REVERTED"
 
 // ReservationService defines business operations for reservation management
 type ReservationServiceInterface interface {
-	CreateReservation(ctx context.Context, request apimodel.CreateReservationRequest) (*model.Reservation, error)
-	UpdateReservation(ctx context.Context, request apimodel.UpdateReservationRequest) (*model.Reservation, error)
+	CreateReservation(ctx context.Context, request apimodel.CreateReservationRequest, uow *uow.UnitOfWork) (*model.Reservation, error)
+	UpdateReservation(ctx context.Context, request apimodel.UpdateReservationRequest, uow *uow.UnitOfWork) (*model.Reservation, error)
 	GetReservationById(ctx context.Context, id uuid.UUID) (*model.Reservation, error)
 	GetReservationByQuoteId(ctx context.Context, quoteId string) (*model.Reservation, error)
 	GetReservationByOrderId(ctx context.Context, orderId string) (*model.Reservation, error)
 	AttachOrder(ctx context.Context, request apimodel.AttachOrderRequest) error
-	CommitReservation(ctx context.Context, request apimodel.CommitReservationRequest) error
-	ReleaseReservation(ctx context.Context, id uuid.UUID) error
-	RevertReservation(ctx context.Context, request apimodel.RevertReservationRequest) error
+	CommitReservation(ctx context.Context, reservation *model.Reservation, orderId string, uow *uow.UnitOfWork) (*model.Reservation, error)
+	ReleaseReservation(ctx context.Context, id uuid.UUID, uow *uow.UnitOfWork) error
+	RevertReservation(ctx context.Context, request apimodel.RevertReservationRequest, uow *uow.UnitOfWork) error
 	ProcessExpiredReservations(ctx context.Context) (int, error)
 	ArchiveReservations(ctx context.Context) (int, error)
 	getExpiresAt() *time.Time
@@ -58,6 +59,7 @@ func NewReservationService(
 func (rs ReservationService) CreateReservation(
 	ctx context.Context,
 	request apimodel.CreateReservationRequest,
+	uow *uow.UnitOfWork,
 ) (*model.Reservation, error) {
 
 	reservation := &model.Reservation{
@@ -67,16 +69,20 @@ func (rs ReservationService) CreateReservation(
 		ExpiresAt:     rs.getExpiresAt(),
 	}
 
-	result, err := rs.repo.Save(ctx, reservation)
-
+	result, err := rs.repo.Save(ctx, reservation, uow)
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
 // UpdateReservation updates an existing reservation.
-func (rs ReservationService) UpdateReservation(ctx context.Context, request apimodel.UpdateReservationRequest) (*model.Reservation, error) {
+func (rs ReservationService) UpdateReservation(
+	ctx context.Context,
+	request apimodel.UpdateReservationRequest,
+	uow *uow.UnitOfWork,
+) (*model.Reservation, error) {
 	reservation, err := rs.repo.GetById(ctx, *request.ReservationId)
 	if err != nil {
 		return nil, err
@@ -90,7 +96,7 @@ func (rs ReservationService) UpdateReservation(ctx context.Context, request apim
 	reservation.Status = statusPending
 	reservation.ExpiresAt = rs.getExpiresAt()
 
-	result, err := rs.repo.Save(ctx, reservation)
+	result, err := rs.repo.Save(ctx, reservation, uow)
 
 	if err != nil {
 		return nil, err
@@ -138,7 +144,7 @@ func (rs ReservationService) AttachOrder(ctx context.Context, request apimodel.A
 	reservation.Status = statusReserved
 	reservation.ExpiresAt = nil
 
-	_, err = rs.repo.Save(ctx, reservation)
+	_, err = rs.repo.Save(ctx, reservation, nil)
 	if err != nil {
 		return err
 	}
@@ -146,35 +152,37 @@ func (rs ReservationService) AttachOrder(ctx context.Context, request apimodel.A
 }
 
 // CommitReservation marks a reservation as committed.
-func (rs ReservationService) CommitReservation(ctx context.Context, request apimodel.CommitReservationRequest) error {
-	reservation, err := rs.repo.GetById(ctx, *request.ReservationId)
-	if err != nil {
-		return err
-	}
-	if *reservation.OrderId != request.OrderId {
-		err = fmt.Errorf(
+func (rs ReservationService) CommitReservation(
+	ctx context.Context,
+	reservation *model.Reservation,
+	orderId string,
+	uow *uow.UnitOfWork,
+) (*model.Reservation, error) {
+
+	if *reservation.OrderId != orderId {
+		err := fmt.Errorf(
 			"reservation order id %s does not match request order id %s",
 			reservation.OrderId,
-			request.OrderId,
+			orderId,
 		)
-		return err
+		return nil, err
 	}
 
-	err = checkAvailableStatuses(*reservation, []string{statusReserved})
+	err := checkAvailableStatuses(*reservation, []string{statusReserved})
 
-	reservation.OrderId = &request.OrderId
+	reservation.OrderId = &orderId
 	reservation.Status = statusCommitted
 	reservation.ExpiresAt = nil
 
-	_, err = rs.repo.Save(ctx, reservation)
+	reservation, err = rs.repo.Save(ctx, reservation, uow)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return reservation, nil
 }
 
 // ReleaseReservation marks a reservation as released.
-func (rs ReservationService) ReleaseReservation(ctx context.Context, id uuid.UUID) error {
+func (rs ReservationService) ReleaseReservation(ctx context.Context, id uuid.UUID, uow *uow.UnitOfWork) error {
 	reservation, err := rs.repo.GetById(ctx, id)
 	if err != nil {
 		return err
@@ -186,7 +194,7 @@ func (rs ReservationService) ReleaseReservation(ctx context.Context, id uuid.UUI
 	reservation.Status = statusReleased
 	reservation.ExpiresAt = nil
 
-	_, err = rs.repo.Save(ctx, reservation)
+	_, err = rs.repo.Save(ctx, reservation, uow)
 	if err != nil {
 		return err
 	}
@@ -194,7 +202,11 @@ func (rs ReservationService) ReleaseReservation(ctx context.Context, id uuid.UUI
 }
 
 // RevertReservation marks a reservation as reverted.
-func (rs ReservationService) RevertReservation(ctx context.Context, request apimodel.RevertReservationRequest) error {
+func (rs ReservationService) RevertReservation(
+	ctx context.Context,
+	request apimodel.RevertReservationRequest,
+	uow *uow.UnitOfWork,
+) error {
 	reservation, err := rs.repo.GetById(ctx, *request.ReservationId)
 	if err != nil {
 		return err
@@ -212,7 +224,7 @@ func (rs ReservationService) RevertReservation(ctx context.Context, request apim
 
 	reservation.Status = statusReverted
 
-	_, err = rs.repo.Save(ctx, reservation)
+	_, err = rs.repo.Save(ctx, reservation, uow)
 	if err != nil {
 		return err
 	}
@@ -222,7 +234,7 @@ func (rs ReservationService) RevertReservation(ctx context.Context, request apim
 // ProcessExpiredReservations updates expired reservations to expired status.
 func (rs ReservationService) ProcessExpiredReservations(ctx context.Context) (int, error) {
 	now := time.Now()
-	query := repository.ReservationsQuery{
+	query := apimodel.ReservationsQuery{
 		ExpiresAtGte: &now,
 		Statuses:     []string{statusPending},
 	}
@@ -233,7 +245,7 @@ func (rs ReservationService) ProcessExpiredReservations(ctx context.Context) (in
 	// later there will be logic with updating reserved qty ane delete items
 	for _, reservation := range reservations {
 		reservation.Status = statusExpired
-		_, err = rs.repo.Save(ctx, reservation)
+		_, err = rs.repo.Save(ctx, reservation, nil)
 		if err != nil {
 			return 0, err
 		}
@@ -246,7 +258,7 @@ func (rs ReservationService) ProcessExpiredReservations(ctx context.Context) (in
 func (rs ReservationService) ArchiveReservations(ctx context.Context) (int, error) {
 	archivaAfter := time.Now().AddDate(0, 0, -rs.config.ArchiveSettings.ArchiveReservationsAfterDays)
 
-	query := repository.ReservationsQuery{
+	query := apimodel.ReservationsQuery{
 		Statuses:    []string{statusCommitted, statusReleased, statusReverted, statusExpired},
 		UpdatedAtLt: &archivaAfter,
 	}

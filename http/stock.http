@@ -4,8 +4,18 @@ Content-Type: application/json
 
 {
   "sku": "{{sku1}}",
-  "qty": 1
+  "on_hand": 1
 }
+
+### Create stock 2
+POST http://localhost:8080/admin/stock
+Content-Type: application/json
+
+{
+  "sku": "{{sku2}}",
+  "on_hand": 10
+}
+
 
 ### Update stock qty
 PUT http://localhost:8080/admin/stock
@@ -13,7 +23,7 @@ Content-Type: application/json
 
 {
   "sku": "{{sku1}}",
-  "qty": 2
+  "on_hand": 10
 }
 
 ### Delete stock record

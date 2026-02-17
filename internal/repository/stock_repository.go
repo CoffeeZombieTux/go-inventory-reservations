@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"go-inventory-reservations/internal/model"
+	apimodel "go-inventory-reservations/internal/model/api"
+	"go-inventory-reservations/internal/uow"
+	"strings"
 	"time"
 )
 
@@ -13,8 +16,8 @@ import (
 type StockRepositoryInterface interface {
 	GetBySku(ctx context.Context, sku string) (*model.Stock, error)
 	GetStocks(ctx context.Context, limit, offset int) ([]*model.Stock, error)
-	Save(ctx context.Context, stock *model.Stock) (*model.Stock, error)
-	UpdateQuantity(ctx context.Context, sku string, onHand int) (*model.Stock, error)
+	Create(ctx context.Context, stock *model.Stock) (*model.Stock, error)
+	Update(ctx context.Context, request apimodel.StockRequest, uow *uow.UnitOfWork) (*model.Stock, error)
 	Delete(ctx context.Context, sku string) error
 	Count(ctx context.Context) (int, error)
 }
@@ -99,7 +102,7 @@ func (sr *StockRepository) GetStocks(ctx context.Context, limit, offset int) ([]
 }
 
 // Save inserts a stock into the database or updates it if it already exists.
-func (sr *StockRepository) Save(ctx context.Context, stock *model.Stock) (*model.Stock, error) {
+func (sr *StockRepository) Create(ctx context.Context, stock *model.Stock) (*model.Stock, error) {
 	query := `
 		INSERT INTO stock (
 			sku, on_hand, reserved, 
@@ -127,17 +130,46 @@ func (sr *StockRepository) Save(ctx context.Context, stock *model.Stock) (*model
 }
 
 // UpdateQuantity updates the stock quantity for a given SKU.
-func (sr *StockRepository) UpdateQuantity(ctx context.Context, sku string, onHand int) (*model.Stock, error) {
-	query := `
-        UPDATE stock
-        SET on_hand = $2, 
-            updated_at = NOW()
-        WHERE sku = $1
-        RETURNING sku, on_hand, reserved, updated_at
-    `
+func (sr *StockRepository) Update(ctx context.Context, request apimodel.StockRequest, uow *uow.UnitOfWork) (*model.Stock, error) {
+	var exec SQLExecutor
+	if uow != nil && uow.GetTransaction() != nil {
+		exec = uow.GetTransaction()
+	} else {
+		exec = sr.db
+	}
+
+	var (
+		fields []string
+		args   []interface{}
+		i      = 1
+	)
+
+	if request.OnHand != nil {
+		fields = append(fields, fmt.Sprintf("on_hand = $%d", i))
+		args = append(args, *request.OnHand)
+		i++
+	}
+	if request.Reserved != nil {
+		fields = append(fields, fmt.Sprintf("reserved = $%d", i))
+		args = append(args, *request.Reserved)
+		i++
+	}
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("no updatable fields provided")
+	}
+	args = append(args, request.SKU)
+
+	query := fmt.Sprintf(`
+		UPDATE stock SET %s, updated_at = NOW()
+		WHERE sku = $%d
+		RETURNING sku, on_hand, reserved, updated_at
+	`,
+		strings.Join(fields, ", "),
+		i,
+	)
 
 	var stock model.Stock
-	err := sr.db.QueryRowContext(ctx, query, sku, onHand).Scan(
+	err := exec.QueryRowContext(ctx, query, args...).Scan(
 		&stock.SKU,
 		&stock.OnHand,
 		&stock.Reserved,
@@ -146,7 +178,7 @@ func (sr *StockRepository) UpdateQuantity(ctx context.Context, sku string, onHan
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("stock not found for SKU: %s", sku)
+			return nil, fmt.Errorf("stock not found for SKU: %s", request.SKU)
 		}
 		return nil, fmt.Errorf("failed to update stock quantity: %w", err)
 	}
