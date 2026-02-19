@@ -3,8 +3,6 @@ package kernel
 import (
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	cronlib "github.com/robfig/cron/v3"
 	"go-inventory-reservations/internal/application"
 	"go-inventory-reservations/internal/config"
 	"go-inventory-reservations/internal/cron"
@@ -21,6 +19,9 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	cronlib "github.com/robfig/cron/v3"
 )
 
 // Kernel is the main application kernel. It contains all required dependencies and handles the application lifecycle.
@@ -81,7 +82,7 @@ func New() (*Kernel, error) {
 		Handler: routerEngine,
 	}
 
-	c := cron.InitCrons(reservationService, log, cfg)
+	c := cron.InitCrons(reservationOrchestrator, reservationService, log, cfg)
 
 	kernel := &Kernel{
 		Config:       cfg,

@@ -2,11 +2,12 @@ package application
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/service"
 	"go-inventory-reservations/internal/uow"
+
+	"github.com/google/uuid"
 )
 
 // ReservationOrchestratorInterface represents the orchestration layer for reservation operations.
@@ -19,6 +20,7 @@ type ReservationOrchestratorInterface interface {
 	CommitReservation(ctx context.Context, params apimodel.CommitReservationRequest) (*model.Reservation, error)
 	ReleaseReservation(ctx context.Context, id uuid.UUID) error
 	RevertReservation(ctx context.Context, request apimodel.RevertReservationRequest) error
+	ProcessExpiredReservations(ctx context.Context) (successCounter int, failureCounter int, err error)
 }
 
 // ReservationOrchestrator represents the orchestration layer for reservation operations.
@@ -35,7 +37,7 @@ func NewReservationOrchestrator(
 	stockService service.StockServiceInterface,
 	reservationService service.ReservationServiceInterface,
 	reservationItemService service.ReservationItemsServiceInterface,
-) *ReservationOrchestrator {
+) ReservationOrchestratorInterface {
 	return &ReservationOrchestrator{
 		uowManager:             uowManager,
 		stockService:           stockService,

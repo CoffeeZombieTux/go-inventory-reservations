@@ -3,13 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"go-inventory-reservations/internal/config"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/repository"
 	"go-inventory-reservations/internal/uow"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // initial statuses
@@ -29,11 +30,12 @@ type ReservationServiceInterface interface {
 	GetReservationById(ctx context.Context, id uuid.UUID) (*model.Reservation, error)
 	GetReservationByQuoteId(ctx context.Context, quoteId string) (*model.Reservation, error)
 	GetReservationByOrderId(ctx context.Context, orderId string) (*model.Reservation, error)
+	GetToBeExpiredReservations(ctx context.Context) ([]*model.Reservation, error)
 	AttachOrder(ctx context.Context, request apimodel.AttachOrderRequest) error
 	CommitReservation(ctx context.Context, reservation *model.Reservation, orderId string, uow *uow.UnitOfWork) (*model.Reservation, error)
 	ReleaseReservation(ctx context.Context, id uuid.UUID, uow *uow.UnitOfWork) error
 	RevertReservation(ctx context.Context, request apimodel.RevertReservationRequest, uow *uow.UnitOfWork) error
-	ProcessExpiredReservations(ctx context.Context) (int, error)
+	ExpireReservation(ctx context.Context, reservation *model.Reservation, uow *uow.UnitOfWork) error
 	ArchiveReservations(ctx context.Context) (int, error)
 	getExpiresAt() *time.Time
 }
@@ -231,8 +233,7 @@ func (rs ReservationService) RevertReservation(
 	return nil
 }
 
-// ProcessExpiredReservations updates expired reservations to expired status.
-func (rs ReservationService) ProcessExpiredReservations(ctx context.Context) (int, error) {
+func (rs ReservationService) GetToBeExpiredReservations(ctx context.Context) ([]*model.Reservation, error) {
 	now := time.Now()
 	query := apimodel.ReservationsQuery{
 		ExpiresAtGte: &now,
@@ -240,18 +241,21 @@ func (rs ReservationService) ProcessExpiredReservations(ctx context.Context) (in
 	}
 	reservations, err := rs.repo.SelectReservationsByQuery(ctx, query, rs.config.QuoteExpirationSettings.Limit)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
+	return reservations, nil
 	// later there will be logic with updating reserved qty ane delete items
-	for _, reservation := range reservations {
-		reservation.Status = statusExpired
-		_, err = rs.repo.Save(ctx, reservation, nil)
-		if err != nil {
-			return 0, err
-		}
 
-	}
-	return len(reservations), nil
+}
+
+func (rs ReservationService) ExpireReservation(
+	ctx context.Context,
+	reservation *model.Reservation,
+	uow *uow.UnitOfWork,
+) error {
+	reservation.Status = statusExpired
+	_, err := rs.repo.Save(ctx, reservation, uow)
+	return err
 }
 
 // ArchiveReservations deletes reservations older than ArchiveSettings.ArchiveReservationsAfterDays days.

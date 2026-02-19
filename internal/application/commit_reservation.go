@@ -56,6 +56,7 @@ func (ro *ReservationOrchestrator) CommitReservation(
 		if err != nil {
 			return nil, err
 		}
+		// TODO: Deactivate reservation item
 	}
 
 	// Update reservation
