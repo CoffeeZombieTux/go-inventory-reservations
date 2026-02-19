@@ -9,4 +9,5 @@ type ReservationItem struct {
 	ReservationId uuid.UUID `db:"reservation_id" json:"reservation_id"` // Reference to the parent reservation
 	SKU           string    `db:"sku" json:"sku"`                       // Product SKU
 	Qty           int       `db:"qty" json:"qty"`                       // Quantity of items being reserved
+	IsActive      bool      `db:"is_active" json:"is_active"`           // True when reservation item still has active hold
 }

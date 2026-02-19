@@ -28,6 +28,12 @@ func (ro *ReservationOrchestrator) CommitReservation(
 		}
 	}()
 
+	// Update reservation
+	reservation, err = ro.reservationService.CommitReservation(ctx, reservation, params.OrderId, unit)
+	if err != nil {
+		return nil, err
+	}
+	
 	// Get reservation items
 	reservedItems, err := ro.reservationItemService.GetReservationItems(ctx, reservation.ReservationId, unit)
 	if err != nil {
@@ -56,13 +62,16 @@ func (ro *ReservationOrchestrator) CommitReservation(
 		if err != nil {
 			return nil, err
 		}
-		// TODO: Deactivate reservation item
-	}
-
-	// Update reservation
-	reservation, err = ro.reservationService.CommitReservation(ctx, reservation, params.OrderId, unit)
-	if err != nil {
-		return nil, err
+		_, err = ro.reservationItemService.SetReservationItemActive(
+			ctx,
+			reservation.ReservationId,
+			item.SKU,
+			false,
+			unit,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = unit.Commit()

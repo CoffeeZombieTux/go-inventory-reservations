@@ -1,14 +1,15 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"go-inventory-reservations/internal/application"
 	"go-inventory-reservations/internal/logger"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/service"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // ReservationHandler handles all reservation-related routes, e.g., reservation creation, etc.
@@ -210,8 +211,8 @@ func (rh *ReservationHandler) ReleaseReservation(ctx *gin.Context) {
 
 	err = rh.reservationOrchestrator.ReleaseReservation(ctx, ReservationId)
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"error": "Reservation not found or already released. ReservationId: " + idStr,
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to release reservation: " + err.Error(),
 		})
 		return
 	}

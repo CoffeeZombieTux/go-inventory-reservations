@@ -26,6 +26,12 @@ func (ro *ReservationOrchestrator) RevertReservation(
 		}
 	}()
 
+	// Update reservation
+	err = ro.reservationService.RevertReservation(ctx, request, unit)
+	if err != nil {
+		return err
+	}
+
 	// Get reservation items
 	reservedItems, err := ro.reservationItemService.GetReservationItems(ctx, reservation.ReservationId, unit)
 	if err != nil {
@@ -52,12 +58,6 @@ func (ro *ReservationOrchestrator) RevertReservation(
 		if err != nil {
 			return err
 		}
-	}
-
-	// Update reservation
-	err = ro.reservationService.RevertReservation(ctx, request, unit)
-	if err != nil {
-		return err
 	}
 
 	err = unit.Commit()

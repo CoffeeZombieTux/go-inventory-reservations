@@ -26,14 +26,14 @@ func (ro *ReservationOrchestrator) ReleaseReservation(ctx context.Context, id uu
 			unit.Rollback()
 		}
 	}()
-
-	err = ro.releaseReservationStocks(ctx, reservation.ReservationId, unit)
+	// Update reservation status
+	err = ro.reservationService.ReleaseReservation(ctx, id, unit)
 	if err != nil {
 		return err
 	}
 
-	// Update reservation status
-	err = ro.reservationService.ReleaseReservation(ctx, id, unit)
+	// Release reservation items
+	err = ro.releaseReservationStocks(ctx, reservation.ReservationId, unit)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,10 @@ func (ro *ReservationOrchestrator) releaseReservationStocks(
 			return err
 		}
 
-		// TODO: Deactivate reservation item
+		_, err = ro.reservationItemService.SetReservationItemActive(ctx, reservationId, item.SKU, false, uow)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

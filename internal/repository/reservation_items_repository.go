@@ -16,6 +16,7 @@ type ReservationItemsRepositoryInterface interface {
 	FindByReservationId(ctx context.Context, reservationId uuid.UUID, uow *uow.UnitOfWork) (map[string]*model.ReservationItem, error)
 	Create(ctx context.Context, item *model.ReservationItem, uow *uow.UnitOfWork) (*model.ReservationItem, error)
 	Update(ctx context.Context, item *model.ReservationItem, uow *uow.UnitOfWork) (*model.ReservationItem, error)
+	SetIsActive(ctx context.Context, reservationId uuid.UUID, sku string, isActive bool, uow *uow.UnitOfWork) (*model.ReservationItem, error)
 	Delete(ctx context.Context, reservationId uuid.UUID, sku string, uow *uow.UnitOfWork) error
 }
 
@@ -44,12 +45,12 @@ func (rir *ReservationItemsRepository) Get(
 	}
 
 	query := `
-		SELECT reservation_id, sku, qty
+		SELECT reservation_id, sku, qty, is_active
 		FROM reservation_items
 		WHERE reservation_id = $1 AND sku = $2
 	`
 	var item model.ReservationItem
-	err := exec.QueryRowContext(ctx, query, reservationId, sku).Scan(&item.ReservationId, &item.SKU, &item.Qty)
+	err := exec.QueryRowContext(ctx, query, reservationId, sku).Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reservation item: %w", err)
 	}
@@ -70,7 +71,7 @@ func (rir *ReservationItemsRepository) FindByReservationId(
 	}
 
 	query := `
-		SELECT reservation_id, sku, qty
+		SELECT reservation_id, sku, qty, is_active
 		FROM reservation_items
 		WHERE reservation_id = $1
 	`
@@ -83,7 +84,7 @@ func (rir *ReservationItemsRepository) FindByReservationId(
 	items := make(map[string]*model.ReservationItem)
 	for rows.Next() {
 		var item model.ReservationItem
-		if err := rows.Scan(&item.ReservationId, &item.SKU, &item.Qty); err != nil {
+		if err := rows.Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive); err != nil {
 			return nil, fmt.Errorf("failed to scan reservation item: %w", err)
 		}
 		items[item.SKU] = &item
@@ -110,10 +111,10 @@ func (rir *ReservationItemsRepository) Create(
 
 	query := `
 		INSERT INTO reservation_items (
-			reservation_id, sku, qty
-		) VALUES ($1, $2, $3)
+			reservation_id, sku, qty, is_active
+		) VALUES ($1, $2, $3, $4)
 	`
-	_, err := exec.ExecContext(ctx, query, item.ReservationId, item.SKU, item.Qty)
+	_, err := exec.ExecContext(ctx, query, item.ReservationId, item.SKU, item.Qty, item.IsActive)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reservation item: %w", err)
 	}
@@ -136,12 +137,12 @@ func (rir *ReservationItemsRepository) Update(
 
 	query := `
 		UPDATE reservation_items
-		SET qty = $2
-		WHERE reservation_id = $1 AND sku = $3
-		RETURNING qty
+		SET qty = $2, is_active = $3
+		WHERE reservation_id = $1 AND sku = $4
+		RETURNING qty, is_active
 	`
 
-	err := exec.QueryRowContext(ctx, query, item.ReservationId, item.Qty, item.SKU).Scan(&item.Qty)
+	err := exec.QueryRowContext(ctx, query, item.ReservationId, item.Qty, item.IsActive, item.SKU).Scan(&item.Qty, &item.IsActive)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf(
@@ -153,6 +154,40 @@ func (rir *ReservationItemsRepository) Update(
 		return nil, fmt.Errorf("failed to update reservation item: %w", err)
 	}
 	return item, nil
+}
+
+// SetIsActive updates reservation item active flag in the database.
+func (rir *ReservationItemsRepository) SetIsActive(
+	ctx context.Context,
+	reservationId uuid.UUID,
+	sku string,
+	isActive bool,
+	uow *uow.UnitOfWork,
+) (*model.ReservationItem, error) {
+	var exec SQLExecutor
+	if uow != nil && uow.GetTransaction() != nil {
+		exec = uow.GetTransaction()
+	} else {
+		exec = rir.db
+	}
+
+	query := `
+		UPDATE reservation_items
+		SET is_active = $3
+		WHERE reservation_id = $1 AND sku = $2
+		RETURNING reservation_id, sku, qty, is_active
+	`
+
+	var item model.ReservationItem
+	err := exec.QueryRowContext(ctx, query, reservationId, sku, isActive).
+		Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("reservation item not found for ReservationID %s and SKU: %s", reservationId, sku)
+		}
+		return nil, fmt.Errorf("failed to update reservation item active flag: %w", err)
+	}
+	return &item, nil
 }
 
 // Delete deletes a reservation item from the database using the provided context and unit of work if available.

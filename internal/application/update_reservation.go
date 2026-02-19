@@ -32,6 +32,13 @@ func (ro *ReservationOrchestrator) UpdateReservation(
 		}
 	}()
 
+	// Update reservation
+	reservation, err = ro.reservationService.UpdateReservation(ctx, params, unit)
+	if err != nil {
+		return nil, err
+	}
+	result.Reservation = reservation
+
 	// Get reservation items
 	reservedItems, err := ro.reservationItemService.GetReservationItems(ctx, reservation.ReservationId, unit)
 	if err != nil {
@@ -115,13 +122,6 @@ func (ro *ReservationOrchestrator) UpdateReservation(
 			result.Items[item.SKU] = createdItem
 		}
 	}
-
-	// Update reservation
-	reservation, err = ro.reservationService.UpdateReservation(ctx, params, unit)
-	if err != nil {
-		return nil, err
-	}
-	result.Reservation = reservation
 
 	err = unit.Commit()
 	if err != nil {
