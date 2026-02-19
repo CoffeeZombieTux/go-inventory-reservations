@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go-inventory-reservations/internal/config"
 	"go-inventory-reservations/internal/model"
@@ -164,7 +165,7 @@ func (rs ReservationService) CommitReservation(
 	if *reservation.OrderId != orderId {
 		err := fmt.Errorf(
 			"reservation order id %s does not match request order id %s",
-			reservation.OrderId,
+			*reservation.OrderId,
 			orderId,
 		)
 		return nil, err
@@ -216,7 +217,7 @@ func (rs ReservationService) RevertReservation(
 	if *reservation.OrderId != request.OrderId {
 		err = fmt.Errorf(
 			"reservation order id %s does not match request order id %s",
-			reservation.OrderId,
+			*reservation.OrderId,
 			request.OrderId,
 		)
 		return err
@@ -295,4 +296,8 @@ func checkAvailableStatuses(reservation model.Reservation, allowedStatuses []str
 		}
 	}
 	return fmt.Errorf("reservation status %s is not allowed for this action", reservation.Status)
+}
+
+func IsReservationVersionConflict(err error) bool {
+	return errors.Is(err, repository.ErrReservationVersionConflict)
 }

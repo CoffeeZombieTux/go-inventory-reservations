@@ -5,12 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/uow"
 	"strings"
+
+	"github.com/google/uuid"
 )
+
+var ErrReservationVersionConflict = errors.New("reservation version conflict")
 
 // ReservationRepositoryInterface defines operations for reservation management
 type ReservationRepositoryInterface interface {
@@ -49,24 +52,64 @@ func (r *ReservationRepository) Save(
 		exec = r.db
 	}
 
-	// Insert reservation (assuming id is UUID)
-	queryRes := `
+	if reservation.Version == 0 {
+		return r.createReservation(ctx, reservation, exec)
+	}
+
+	return r.updateReservationWithVersion(ctx, reservation, exec)
+}
+
+// createReservation inserts a new reservation into the database.
+func (r *ReservationRepository) createReservation(
+	ctx context.Context,
+	reservation *model.Reservation,
+	exec SQLExecutor,
+) (*model.Reservation, error) {
+	query := `
 		INSERT INTO reservations (reservation_id, status, quote_id, order_id, expires_at, items_hash, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (reservation_id)
-		DO UPDATE SET
-			status = EXCLUDED.status,
-			quote_id = EXCLUDED.quote_id,
-			order_id = EXCLUDED.order_id,
-			expires_at = EXCLUDED.expires_at,
-			items_hash = EXCLUDED.items_hash,
-			version = EXCLUDED.version,
-			updated_at = NOW()
-		RETURNING reservation_id, created_at, updated_at
+		VALUES ($1, $2, $3, $4, $5, $6, 1)
+		RETURNING reservation_id, created_at, updated_at, version
 	`
+
 	err := exec.QueryRowContext(
 		ctx,
-		queryRes,
+		query,
+		reservation.ReservationId,
+		reservation.Status,
+		reservation.QuoteId,
+		reservation.OrderId,
+		reservation.ExpiresAt,
+		reservation.ItemsHash,
+	).Scan(&reservation.ReservationId, &reservation.CreatedAt, &reservation.UpdatedAt, &reservation.Version)
+	if err != nil {
+		return nil, fmt.Errorf("save reservation create failed: %w", err)
+	}
+
+	return reservation, nil
+}
+
+// updateReservationWithVersion updates a reservation with the given version.
+func (r *ReservationRepository) updateReservationWithVersion(
+	ctx context.Context,
+	reservation *model.Reservation,
+	exec SQLExecutor,
+) (*model.Reservation, error) {
+	query := `
+		UPDATE reservations
+		SET status = $2,
+		    quote_id = $3,
+		    order_id = $4,
+		    expires_at = $5,
+		    items_hash = $6,
+		    version = version + 1,
+		    updated_at = NOW()
+		WHERE reservation_id = $1 AND version = $7
+		RETURNING reservation_id, created_at, updated_at, version
+	`
+
+	err := exec.QueryRowContext(
+		ctx,
+		query,
 		reservation.ReservationId,
 		reservation.Status,
 		reservation.QuoteId,
@@ -74,12 +117,21 @@ func (r *ReservationRepository) Save(
 		reservation.ExpiresAt,
 		reservation.ItemsHash,
 		reservation.Version,
-	).Scan(&reservation.ReservationId, &reservation.CreatedAt, &reservation.UpdatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("save reservation: %w", err)
+	).Scan(&reservation.ReservationId, &reservation.CreatedAt, &reservation.UpdatedAt, &reservation.Version)
+	if err == nil {
+		return reservation, nil
 	}
 
-	return reservation, nil
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf(
+			"%w: reservation_id=%s expected_version=%d",
+			ErrReservationVersionConflict,
+			reservation.ReservationId,
+			reservation.Version,
+		)
+	}
+
+	return nil, fmt.Errorf("save reservation update failed: %w", err)
 }
 
 // GetById returns a reservation by its reservationID.
@@ -215,7 +267,7 @@ func (r *ReservationRepository) getReservation(
 		&res.Version,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("no reservation found with query: %w", query) // Not found
+		return nil, fmt.Errorf("no reservation found for query: %s", query) // Not found
 	}
 
 	if err != nil {

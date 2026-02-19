@@ -67,6 +67,12 @@ func (rh *ReservationHandler) UpdateReservation(ctx *gin.Context) {
 
 	reservation, err := rh.reservationOrchestrator.UpdateReservation(ctx, req)
 	if err != nil {
+		if service.IsReservationVersionConflict(err) {
+			ctx.JSON(http.StatusConflict, gin.H{
+				"error": "Reservation was updated concurrently. Please retry.",
+			})
+			return
+		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to update reservation: " + err.Error(),
 		})
@@ -160,6 +166,12 @@ func (rh *ReservationHandler) AttachOrder(ctx *gin.Context) {
 
 	err := rh.reservationService.AttachOrder(ctx, req)
 	if err != nil {
+		if service.IsReservationVersionConflict(err) {
+			ctx.JSON(http.StatusConflict, gin.H{
+				"error": "Reservation was updated concurrently. Please retry.",
+			})
+			return
+		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to attach order to reservation: " + err.Error(),
 		})
@@ -182,6 +194,12 @@ func (rh *ReservationHandler) CommitReservation(ctx *gin.Context) {
 
 	_, err := rh.reservationOrchestrator.CommitReservation(ctx, req)
 	if err != nil {
+		if service.IsReservationVersionConflict(err) {
+			ctx.JSON(http.StatusConflict, gin.H{
+				"error": "Reservation was updated concurrently. Please retry.",
+			})
+			return
+		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to commit reservation: " + err.Error(),
 		})
@@ -211,6 +229,12 @@ func (rh *ReservationHandler) ReleaseReservation(ctx *gin.Context) {
 
 	err = rh.reservationOrchestrator.ReleaseReservation(ctx, ReservationId)
 	if err != nil {
+		if service.IsReservationVersionConflict(err) {
+			ctx.JSON(http.StatusConflict, gin.H{
+				"error": "Reservation was updated concurrently. Please retry.",
+			})
+			return
+		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to release reservation: " + err.Error(),
 		})
@@ -232,6 +256,12 @@ func (rh *ReservationHandler) Revert(ctx *gin.Context) {
 
 	err := rh.reservationOrchestrator.RevertReservation(ctx, req)
 	if err != nil {
+		if service.IsReservationVersionConflict(err) {
+			ctx.JSON(http.StatusConflict, gin.H{
+				"error": "Reservation was updated concurrently. Please retry.",
+			})
+			return
+		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to revert reservation: " + err.Error(),
 		})

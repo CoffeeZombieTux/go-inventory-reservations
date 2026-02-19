@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"go-inventory-reservations/internal/model"
+	"go-inventory-reservations/internal/service"
 )
 
 // ProcessExpiredReservations processes all expired reservations with items.
@@ -41,6 +42,9 @@ func (ro *ReservationOrchestrator) processExpiredReservation(
 
 	err = ro.reservationService.ExpireReservation(ctx, reservation, unit)
 	if err != nil {
+		if service.IsReservationVersionConflict(err) {
+			return nil
+		}
 		return err
 	}
 
