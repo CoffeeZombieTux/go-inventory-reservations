@@ -4,6 +4,7 @@
 ### Create reservation
 POST {{host}}/reservation
 Content-Type: application/json
+Authorization: Bearer {{publicToken}}
 
 {
   "quote_id": "{{quoteId}}",
@@ -24,6 +25,7 @@ Content-Type: application/json
 ### Update reservation
 PUT http://localhost:8080/reservation
 Content-Type: application/json
+Authorization: Bearer {{publicToken}}
 
 {
   "reservation_id": "{{reservationId}}",
@@ -42,9 +44,11 @@ Content-Type: application/json
 
 ### Get reservation by id
 GET http://localhost:8080/reservation/{{reservationId}}
+Authorization: Bearer {{publicToken}}
 
 ### Get reservation by quote id
 GET http://localhost:8080/reservation/quote/{{quoteId}}
+Authorization: Bearer {{publicToken}}
 
 > {%
     // JavaScript code to save the reservationId from the response body
@@ -54,6 +58,7 @@ GET http://localhost:8080/reservation/quote/{{quoteId}}
 
 ### Get reservation by order id
 GET http://localhost:8080/reservation/order/{{orderId}}
+Authorization: Bearer {{publicToken}}
 
 > {%
     // JavaScript code to save the reservationId from the response body
@@ -63,6 +68,7 @@ GET http://localhost:8080/reservation/order/{{orderId}}
 ### Attach Order to reservation
 POST http://localhost:8080/reservation/attach-order
 Content-Type: application/json
+Authorization: Bearer {{publicToken}}
 
 {
   "reservation_id": "{{reservationId}}",
@@ -72,6 +78,7 @@ Content-Type: application/json
 ### Commit reservation by id
 POST http://localhost:8080/reservation/commit
 Content-Type: application/json
+Authorization: Bearer {{publicToken}}
 
 {
   "reservation_id": "{{reservationId}}",
@@ -80,10 +87,12 @@ Content-Type: application/json
 
 ### Release reservation by id
 GET http://localhost:8080/reservation/{{reservationId}}/release
+Authorization: Bearer {{publicToken}}
 
 ### Revert reservation
 POST http://localhost:8080/reservation/revert
 Content-Type: application/json
+Authorization: Bearer {{publicToken}}
 
 {
   "reservation_id": "{{reservationId}}",

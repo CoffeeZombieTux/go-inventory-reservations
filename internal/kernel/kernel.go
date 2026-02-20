@@ -80,7 +80,7 @@ func New() (*Kernel, error) {
 
 	// Gin router and HTTP server setup
 	routerEngine := gin.Default()
-	router.SetupRoutes(routerEngine, *handlersPool)
+	router.SetupRoutes(routerEngine, *handlersPool, cfg)
 
 	port := strconv.Itoa(cfg.Server.Port)
 	httpServer := &http.Server{

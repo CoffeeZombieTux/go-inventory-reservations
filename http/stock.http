@@ -1,6 +1,7 @@
 ### Create stock
 POST http://localhost:8080/admin/stock
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 {
   "sku": "{{sku1}}",
@@ -10,6 +11,7 @@ Content-Type: application/json
 ### Create stock 2
 POST http://localhost:8080/admin/stock
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 {
   "sku": "{{sku2}}",
@@ -20,6 +22,7 @@ Content-Type: application/json
 ### Update stock qty
 PUT http://localhost:8080/admin/stock
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 {
   "sku": "{{sku1}}",
@@ -29,19 +32,24 @@ Content-Type: application/json
 ### Delete stock record
 DELETE http://localhost:8080/admin/stock/{{sku1}}
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 ### Get Stock by sku
 GET http://localhost:8080/stock/{{sku1}}
 Content-Type: application/json
+Authorization: Bearer {{publicToken}}
 
 ### Get Stocks with pagination
 GET http://localhost:8080/stock?limit=5&offset=2
 Content-Type: application/json
+Authorization: Bearer {{publicToken}}
 
 ### Get Stocks with pagination default values limit=50&offset=0
 GET http://localhost:8080/stock
 Content-Type: application/json
+Authorization: Bearer {{publicToken}}
 
 ### Get Active Reservation Items by SKU (admin) with pagination
 GET http://localhost:8080/admin/stock/{{sku1}}/reservation-items?limit=10&offset=0
 Content-Type: application/json
+Authorization: Bearer {{adminToken}}

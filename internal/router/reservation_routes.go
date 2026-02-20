@@ -6,8 +6,9 @@ import (
 )
 
 // setupReservationRoutes sets up the reservation routes
-func setupReservationRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
+func setupReservationRoutes(engine *gin.Engine, handlersPool handler.HandlersPool, publicAuth gin.HandlerFunc) {
 	reservation := engine.Group("/reservation")
+	reservation.Use(publicAuth)
 	reservation.POST("", handlersPool.Reservation.CreateReservation)
 	reservation.PUT("", handlersPool.Reservation.UpdateReservation)
 	reservation.GET("/:id", handlersPool.Reservation.GetReservationById)

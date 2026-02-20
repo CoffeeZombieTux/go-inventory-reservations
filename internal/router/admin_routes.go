@@ -6,8 +6,7 @@ import (
 )
 
 // setupAdminRoutes sets up the admin routes
-func setupAdminRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
-	admin := engine.Group("/admin")
+func setupAdminRoutes(admin *gin.RouterGroup, handlersPool handler.HandlersPool) {
 	admin.POST("/stock", handlersPool.Admin.CreateStock)
 	admin.PUT("/stock", handlersPool.Admin.UpdateStock)
 	admin.DELETE("/stock/:sku", handlersPool.Admin.DeleteStock)

@@ -11,6 +11,7 @@ type Config struct {
 	Database                DatabaseConfig
 	Logger                  LoggerConfig
 	Server                  ServerConfig
+	Auth                    AuthConfig
 	QuoteExpirationSettings QuoteExpirationSettings
 	ArchiveSettings         ArchiveSettings
 	ReservationItemSettings ReservationItemSettings
@@ -36,6 +37,12 @@ type LoggerConfig struct {
 type ServerConfig struct {
 	Port int
 	Host string
+}
+
+// AuthConfig represents API authentication tokens for route groups.
+type AuthConfig struct {
+	AdminToken  string
+	PublicToken string
 }
 
 // QuoteExpirationSettings represents the quote expiration feature settings
@@ -75,6 +82,10 @@ func Load() (*Config, error) {
 		Server: ServerConfig{
 			Port: getEnvInt("SERVER_PORT", 8080),
 			Host: getEnv("SERVER_HOST", "0.0.0.0"),
+		},
+		Auth: AuthConfig{
+			AdminToken:  getEnv("ADMIN_API_TOKEN", ""),
+			PublicToken: getEnv("PUBLIC_API_TOKEN", ""),
 		},
 		QuoteExpirationSettings: QuoteExpirationSettings{
 			QuoteExpirationMinutes: getEnvInt("QUOTE_EXPIRATION_MINUTES", 15),
