@@ -12,7 +12,8 @@ import (
 // StockServiceInterface defines business operations for stock management
 type StockServiceInterface interface {
 	CreateStock(ctx context.Context, req apimodel.StockRequest) (*model.Stock, error)
-	GetStockBySku(ctx context.Context, sku string) (*model.Stock, error)
+	GetStockBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error)
+	GetStockBySkuForUpdate(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error)
 	GetStocks(
 		ctx context.Context,
 		requestedLimit,
@@ -62,8 +63,13 @@ func (ss *StockService) CreateStock(ctx context.Context, req apimodel.StockReque
 }
 
 // GetStockBySku returns a stock item by its SKU.
-func (ss *StockService) GetStockBySku(ctx context.Context, sku string) (*model.Stock, error) {
-	return ss.repo.GetBySku(ctx, sku)
+func (ss *StockService) GetStockBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error) {
+	return ss.repo.GetBySku(ctx, sku, uow)
+}
+
+// GetStockBySkuForUpdate returns a stock item by its SKU with a FOR UPDATE lock.
+func (ss *StockService) GetStockBySkuForUpdate(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error) {
+	return ss.repo.GetBySkuForUpdate(ctx, sku, uow)
 }
 
 // GetStocks returns a list of stock items.
@@ -122,7 +128,7 @@ func (ss *StockService) AdjustInventory(ctx context.Context, req apimodel.StockR
 
 // ReserveStock reserves a given quantity of stock items for a given SKU. Qty can be negative.
 func (ss *StockService) ReserveStock(ctx context.Context, sku string, qty int, uow *uow.UnitOfWork) (*model.Stock, error) {
-	stock, err := ss.GetStockBySku(ctx, sku)
+	stock, err := ss.GetStockBySkuForUpdate(ctx, sku, uow)
 	if err != nil {
 		return nil, err
 	}

@@ -14,7 +14,8 @@ import (
 
 // StockRepositoryInterface defines operations for stock management
 type StockRepositoryInterface interface {
-	GetBySku(ctx context.Context, sku string) (*model.Stock, error)
+	GetBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error)
+	GetBySkuForUpdate(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error)
 	GetStocks(ctx context.Context, limit, offset int) ([]*model.Stock, error)
 	Create(ctx context.Context, stock *model.Stock) (*model.Stock, error)
 	Update(ctx context.Context, request apimodel.StockRequest, uow *uow.UnitOfWork) (*model.Stock, error)
@@ -35,15 +36,34 @@ func NewStockRepository(db *sql.DB) StockRepositoryInterface {
 }
 
 // GetBySku returns a stock by its SKU.
-func (sr *StockRepository) GetBySku(ctx context.Context, sku string) (*model.Stock, error) {
+func (sr *StockRepository) GetBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error) {
+	return sr.getBySku(ctx, sku, uow, false)
+}
+
+// GetBySkuForUpdate returns a stock by its SKU with FOR UPDATE lock.
+func (sr *StockRepository) GetBySkuForUpdate(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error) {
+	return sr.getBySku(ctx, sku, uow, true)
+}
+
+func (sr *StockRepository) getBySku(ctx context.Context, sku string, uow *uow.UnitOfWork, forUpdate bool) (*model.Stock, error) {
+	var exec SQLExecutor
+	if uow != nil && uow.GetTransaction() != nil {
+		exec = uow.GetTransaction()
+	} else {
+		exec = sr.db
+	}
+
 	query := `
         SELECT sku, on_hand, reserved, updated_at
         FROM stock
         WHERE sku = $1
     `
+	if forUpdate {
+		query += " FOR UPDATE"
+	}
 
 	var stock model.Stock
-	err := sr.db.QueryRowContext(
+	err := exec.QueryRowContext(
 		ctx,
 		query,
 		sku,
@@ -55,7 +75,6 @@ func (sr *StockRepository) GetBySku(ctx context.Context, sku string) (*model.Sto
 	)
 
 	if err != nil {
-		// Use errors.Is for wrapped error checking
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("stock not found for SKU: %s", sku)
 		}

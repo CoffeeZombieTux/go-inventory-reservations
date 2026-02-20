@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
+	"go-inventory-reservations/internal/service"
 )
 
 // UpdateReservation orchestrates the process of updating a reservation.
@@ -20,6 +21,19 @@ func (ro *ReservationOrchestrator) UpdateReservation(
 	reservation, err := ro.reservationService.GetReservationById(ctx, *params.ReservationId)
 	if err != nil {
 		return nil, err
+	}
+
+	requestItemsHash := service.BuildReservationItemsHashFromRequests(params.Items)
+	if reservation.QuoteId != nil &&
+		*reservation.QuoteId == params.QuoteId &&
+		itemsHashEqual(reservation.ItemsHash, requestItemsHash) {
+		items, err := ro.reservationItemService.GetReservationItems(ctx, reservation.ReservationId, nil)
+		if err != nil {
+			return nil, err
+		}
+		result.Reservation = reservation
+		result.Items = items
+		return &result, nil
 	}
 
 	unit, err := ro.uowManager.Begin(ctx)
@@ -48,7 +62,7 @@ func (ro *ReservationOrchestrator) UpdateReservation(
 
 	// Check if there are enough stock items for all items in the reservation
 	for _, item := range items {
-		stock, err := ro.stockService.GetStockBySku(ctx, item.SKU)
+		stock, err := ro.stockService.GetStockBySku(ctx, item.SKU, unit)
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +122,7 @@ func (ro *ReservationOrchestrator) UpdateReservation(
 			if err != nil {
 				return nil, err
 			}
-			stock, err := ro.stockService.GetStockBySku(ctx, item.SKU)
+			stock, err := ro.stockService.GetStockBySku(ctx, item.SKU, unit)
 			if err != nil {
 				return nil, err
 			}
@@ -128,4 +142,14 @@ func (ro *ReservationOrchestrator) UpdateReservation(
 		return nil, err
 	}
 	return &result, nil
+}
+
+func itemsHashEqual(a *string, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }

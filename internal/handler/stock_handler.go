@@ -1,11 +1,12 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
 	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/service"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 // StockHandler handles all stock-related routes, e.g. stock retrieval, etc.
@@ -32,7 +33,7 @@ func (sh *StockHandler) GetStockBySku(ctx *gin.Context) {
 		return
 	}
 
-	stock, err := sh.stockService.GetStockBySku(ctx, sku)
+	stock, err := sh.stockService.GetStockBySku(ctx, sku, nil)
 	if err != nil {
 		sh.logger.Error("Failed to get stock", "error", err.Error(), "sku", sku)
 		ctx.JSON(http.StatusInternalServerError, gin.H{

@@ -70,6 +70,7 @@ func (rs ReservationService) CreateReservation(
 		Status:        statusPending,
 		QuoteId:       &request.QuoteId,
 		ExpiresAt:     rs.getExpiresAt(),
+		ItemsHash:     BuildReservationItemsHashFromRequests(request.Items),
 	}
 
 	result, err := rs.repo.Save(ctx, reservation, uow)
@@ -98,6 +99,7 @@ func (rs ReservationService) UpdateReservation(
 	reservation.QuoteId = &request.QuoteId
 	reservation.Status = statusPending
 	reservation.ExpiresAt = rs.getExpiresAt()
+	reservation.ItemsHash = BuildReservationItemsHashFromRequests(request.Items)
 
 	result, err := rs.repo.Save(ctx, reservation, uow)
 
@@ -176,6 +178,7 @@ func (rs ReservationService) CommitReservation(
 	reservation.OrderId = &orderId
 	reservation.Status = statusCommitted
 	reservation.ExpiresAt = nil
+	reservation.ItemsHash = nil
 
 	reservation, err = rs.repo.Save(ctx, reservation, uow)
 	if err != nil {
@@ -196,6 +199,7 @@ func (rs ReservationService) ReleaseReservation(ctx context.Context, id uuid.UUI
 	}
 	reservation.Status = statusReleased
 	reservation.ExpiresAt = nil
+	reservation.ItemsHash = nil
 
 	_, err = rs.repo.Save(ctx, reservation, uow)
 	if err != nil {
@@ -226,6 +230,7 @@ func (rs ReservationService) RevertReservation(
 	err = checkAvailableStatuses(*reservation, []string{statusCommitted})
 
 	reservation.Status = statusReverted
+	reservation.ItemsHash = nil
 
 	_, err = rs.repo.Save(ctx, reservation, uow)
 	if err != nil {
@@ -255,6 +260,7 @@ func (rs ReservationService) ExpireReservation(
 	uow *uow.UnitOfWork,
 ) error {
 	reservation.Status = statusExpired
+	reservation.ItemsHash = nil
 	_, err := rs.repo.Save(ctx, reservation, uow)
 	return err
 }
