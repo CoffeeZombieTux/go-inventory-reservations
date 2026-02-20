@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestPingRoute verifies that the ping endpoint returns 200 with pong message.
 func TestPingRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.Default()

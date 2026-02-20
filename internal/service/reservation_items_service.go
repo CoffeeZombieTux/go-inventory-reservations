@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"go-inventory-reservations/internal/config"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/repository"
@@ -22,13 +24,18 @@ type ReservationItemsServiceInterface interface {
 
 // ReservationItemsService is a service for reservation items management.
 type ReservationItemsService struct {
-	repo repository.ReservationItemsRepositoryInterface
+	repo   repository.ReservationItemsRepositoryInterface
+	config *config.Config
 }
 
 // NewReservationItemsService creates a new ReservationItemsService instance.
-func NewReservationItemsService(repo repository.ReservationItemsRepositoryInterface) ReservationItemsServiceInterface {
+func NewReservationItemsService(
+	repo repository.ReservationItemsRepositoryInterface,
+	config *config.Config,
+) ReservationItemsServiceInterface {
 	return &ReservationItemsService{
-		repo: repo,
+		repo:   repo,
+		config: config,
 	}
 }
 
@@ -52,11 +59,11 @@ func (ris ReservationItemsService) GetReservationItems(
 	reservationId uuid.UUID,
 	uow *uow.UnitOfWork,
 ) (map[string]*model.ReservationItem, error) {
-	reservationItem, err := ris.repo.FindByReservationId(ctx, reservationId, uow)
+	reservationItems, err := ris.repo.FindByReservationId(ctx, reservationId, uow)
 	if err != nil {
 		return nil, err
 	}
-	return reservationItem, nil
+	return reservationItems, nil
 }
 
 // CreateReservationItem creates a new reservation item based on the given request and associates it with a reservation ID.
@@ -72,6 +79,12 @@ func (ris ReservationItemsService) CreateReservationItem(
 		Qty:           request.Quantity,
 		IsActive:      true,
 	}
+
+	err := ris.validateReservationItemQuantity(reservationItem)
+	if err != nil {
+		return nil, err
+	}
+
 	result, err := ris.repo.Create(ctx, reservationItem, uow)
 	if err != nil {
 		return nil, err
@@ -92,6 +105,11 @@ func (ris ReservationItemsService) UpdateReservationItem(
 	}
 	reservationItem.Qty = request.Quantity
 	reservationItem.IsActive = request.Quantity > 0
+
+	err = ris.validateReservationItemQuantity(reservationItem)
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := ris.repo.Update(ctx, reservationItem, uow)
 	if err != nil {
@@ -125,6 +143,17 @@ func (ris ReservationItemsService) DeleteReservationItem(
 	err := ris.repo.Delete(ctx, reservationId, sku, uow)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// validateReservationItemQuantity validates reservation item quantity constraints.
+func (ris ReservationItemsService) validateReservationItemQuantity(reservationItem *model.ReservationItem) error {
+	if reservationItem.Qty > ris.config.ReservationItemSettings.MaxQuantity {
+		return fmt.Errorf("quantity exceeds maximum allowed: %d", ris.config.ReservationItemSettings.MaxQuantity)
+	}
+	if reservationItem.Qty < 0 {
+		return fmt.Errorf("quantity cannot be negative")
 	}
 	return nil
 }

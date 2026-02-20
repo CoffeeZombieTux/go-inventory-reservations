@@ -14,7 +14,7 @@ import (
 
 // StockRepositoryInterface defines operations for stock management
 type StockRepositoryInterface interface {
-	GetBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error)
+	GetBySku(ctx context.Context, sku string) (*model.Stock, error)
 	GetBySkuForUpdate(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error)
 	GetStocks(ctx context.Context, limit, offset int) ([]*model.Stock, error)
 	Create(ctx context.Context, stock *model.Stock) (*model.Stock, error)
@@ -36,8 +36,8 @@ func NewStockRepository(db *sql.DB) StockRepositoryInterface {
 }
 
 // GetBySku returns a stock by its SKU.
-func (sr *StockRepository) GetBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error) {
-	return sr.getBySku(ctx, sku, uow, false)
+func (sr *StockRepository) GetBySku(ctx context.Context, sku string) (*model.Stock, error) {
+	return sr.getBySku(ctx, sku, nil, false)
 }
 
 // GetBySkuForUpdate returns a stock by its SKU with FOR UPDATE lock.
@@ -45,7 +45,13 @@ func (sr *StockRepository) GetBySkuForUpdate(ctx context.Context, sku string, uo
 	return sr.getBySku(ctx, sku, uow, true)
 }
 
-func (sr *StockRepository) getBySku(ctx context.Context, sku string, uow *uow.UnitOfWork, forUpdate bool) (*model.Stock, error) {
+// getBySku returns a stock record by SKU and optionally applies FOR UPDATE locking.
+func (sr *StockRepository) getBySku(
+	ctx context.Context,
+	sku string,
+	uow *uow.UnitOfWork,
+	forUpdate bool,
+) (*model.Stock, error) {
 	var exec SQLExecutor
 	if uow != nil && uow.GetTransaction() != nil {
 		exec = uow.GetTransaction()
@@ -120,7 +126,7 @@ func (sr *StockRepository) GetStocks(ctx context.Context, limit, offset int) ([]
 	return stocks, nil
 }
 
-// Save inserts a stock into the database or updates it if it already exists.
+// Create inserts a stock into the database.
 func (sr *StockRepository) Create(ctx context.Context, stock *model.Stock) (*model.Stock, error) {
 	query := `
 		INSERT INTO stock (
@@ -148,7 +154,7 @@ func (sr *StockRepository) Create(ctx context.Context, stock *model.Stock) (*mod
 	return stock, nil
 }
 
-// UpdateQuantity updates the stock quantity for a given SKU.
+// Update updates stock fields for a given SKU.
 func (sr *StockRepository) Update(ctx context.Context, request apimodel.StockRequest, uow *uow.UnitOfWork) (*model.Stock, error) {
 	var exec SQLExecutor
 	if uow != nil && uow.GetTransaction() != nil {

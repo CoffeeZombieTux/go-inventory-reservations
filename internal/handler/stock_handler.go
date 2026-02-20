@@ -33,7 +33,7 @@ func (sh *StockHandler) GetStockBySku(ctx *gin.Context) {
 		return
 	}
 
-	stock, err := sh.stockService.GetStockBySku(ctx, sku, nil)
+	stock, err := sh.stockService.GetStockBySku(ctx, sku)
 	if err != nil {
 		sh.logger.Error("Failed to get stock", "error", err.Error(), "sku", sku)
 		ctx.JSON(http.StatusInternalServerError, gin.H{

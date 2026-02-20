@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+// main starts the application kernel.
 func main() {
 	k, err := kernel.New()
 	if err != nil {

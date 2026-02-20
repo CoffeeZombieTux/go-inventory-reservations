@@ -4,6 +4,7 @@ import (
 	"context"
 	"go-inventory-reservations/internal/model"
 	"go-inventory-reservations/internal/service"
+	"go-inventory-reservations/internal/uow"
 )
 
 // ProcessExpiredReservations processes all expired reservations with items.
@@ -25,34 +26,21 @@ func (ro *ReservationOrchestrator) ProcessExpiredReservations(
 	return successCounter, failureCounter, nil
 }
 
+// processExpiredReservation expires a single reservation and releases its reserved stock.
 func (ro *ReservationOrchestrator) processExpiredReservation(
 	ctx context.Context,
 	reservation *model.Reservation,
 ) error {
-	unit, err := ro.uowManager.Begin(ctx)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
+	err := ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+		err := ro.reservationService.ExpireReservationHelper(ctx, reservation, unit)
 		if err != nil {
-			_ = unit.Rollback()
+			if service.IsReservationVersionConflict(err) {
+				return nil
+			}
+			return err
 		}
-	}()
 
-	err = ro.reservationService.ExpireReservation(ctx, reservation, unit)
-	if err != nil {
-		if service.IsReservationVersionConflict(err) {
-			return nil
-		}
-		return err
-	}
-
-	err = ro.releaseReservationStocks(ctx, reservation.ReservationId, unit)
-	if err != nil {
-		return err
-	}
-
-	err = unit.Commit()
+		return ro.releaseReservationStocks(ctx, reservation.ReservationId, unit)
+	})
 	return err
 }

@@ -1,8 +1,9 @@
 package api_model
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // StockRequest represents a request to reserve stock items
@@ -54,17 +55,17 @@ type CreateReservationRequest struct {
 	Items   []ReservationItemRequest `json:"items" binding:"required,gt=0"`
 }
 
-// ReservationItemRequest represents a request to reserve a single item
-type ReservationItemRequest struct {
-	SKU      string `json:"sku" binding:"required"`
-	Quantity int    `json:"qty" binding:"required,gte=0"`
-}
-
 // UpdateReservationRequest represents a request to update a reservation
 type UpdateReservationRequest struct {
 	ReservationId *uuid.UUID               `json:"reservation_id" binding:"required"`
 	QuoteId       string                   `json:"quote_id" binding:"required"`
-	Items         []ReservationItemRequest `json:"items" binding:"required,gt=0"`
+	Items         []ReservationItemRequest `json:"items" binding:"required"`
+}
+
+// ReservationItemRequest represents a request to reserve a single item
+type ReservationItemRequest struct {
+	SKU      string `json:"sku" binding:"required"`
+	Quantity int    `json:"qty" binding:"required,gte=0"`
 }
 
 // CommitReservationRequest represents a request to commit a reservation

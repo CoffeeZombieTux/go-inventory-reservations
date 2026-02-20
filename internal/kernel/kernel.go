@@ -60,7 +60,7 @@ func New() (*Kernel, error) {
 	// Services
 	stockService := service.NewStockService(stockRepo)
 	reservationService := service.NewReservationService(reservationRepo, cfg)
-	reservationItemService := service.NewReservationItemsService(reservationItemRepo)
+	reservationItemService := service.NewReservationItemsService(reservationItemRepo, cfg)
 
 	reservationOrchestrator := application.NewReservationOrchestrator(
 		unitOfWork,

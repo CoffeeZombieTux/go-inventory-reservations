@@ -45,3 +45,30 @@ func NewReservationOrchestrator(
 		reservationItemService: reservationItemService,
 	}
 }
+
+// withUnitOfWork executes fn in a transaction and commits on success.
+func (ro *ReservationOrchestrator) withUnitOfWork(
+	ctx context.Context,
+	fn func(unit *uow.UnitOfWork) error,
+) (err error) {
+	unit, err := ro.uowManager.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			_ = unit.Rollback()
+			panic(panicErr)
+		}
+		if err != nil {
+			_ = unit.Rollback()
+		}
+	}()
+
+	err = fn(unit)
+	if err != nil {
+		return err
+	}
+
+	return unit.Commit()
+}
