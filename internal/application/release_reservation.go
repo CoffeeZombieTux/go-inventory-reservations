@@ -12,37 +12,16 @@ import (
 // It updates the stock inventory and updates the reservation status.
 // It also deletes the reservation items.
 func (ro *ReservationOrchestrator) ReleaseReservation(ctx context.Context, id uuid.UUID) error {
-	reservation, err := ro.reservationService.GetReservationById(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	unit, err := ro.uowManager.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() {
+	return ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+		// Update reservation status
+		reservation, err := ro.reservationService.ReleaseReservationHelper(ctx, id, unit)
 		if err != nil {
-			unit.Rollback()
+			return err
 		}
-	}()
-	// Update reservation status
-	err = ro.reservationService.ReleaseReservation(ctx, id, unit)
-	if err != nil {
-		return err
-	}
 
-	// Release reservation items
-	err = ro.releaseReservationStocks(ctx, reservation.ReservationId, unit)
-	if err != nil {
-		return err
-	}
-
-	err = unit.Commit()
-	if err != nil {
-		return err
-	}
-	return nil
+		// Release reservation items
+		return ro.releaseReservationStocks(ctx, reservation.ReservationId, unit)
+	})
 }
 
 // releaseReservationStocks updates the stock inventory.
@@ -59,7 +38,7 @@ func (ro *ReservationOrchestrator) releaseReservationStocks(
 
 	for _, item := range reservedItems {
 		// Get stock for item
-		stock, err := ro.stockService.GetStockBySku(ctx, item.SKU)
+		stock, err := ro.stockService.GetStockBySkuForUpdate(ctx, item.SKU, uow)
 		if err != nil {
 			return err
 		}

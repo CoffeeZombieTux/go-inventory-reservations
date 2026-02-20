@@ -19,6 +19,7 @@ var ErrReservationVersionConflict = errors.New("reservation version conflict")
 type ReservationRepositoryInterface interface {
 	Save(ctx context.Context, reservation *model.Reservation, uow *uow.UnitOfWork) (*model.Reservation, error)
 	GetById(ctx context.Context, id uuid.UUID) (*model.Reservation, error)
+	GetByIdForUpdate(ctx context.Context, id uuid.UUID, uow *uow.UnitOfWork) (*model.Reservation, error)
 	GetByQuoteId(ctx context.Context, quoteId string) (*model.Reservation, error)
 	GetByOrderId(ctx context.Context, orderId string) (*model.Reservation, error)
 	SelectReservationsByQuery(
@@ -135,9 +136,26 @@ func (r *ReservationRepository) updateReservationWithVersion(
 }
 
 // GetById returns a reservation by its reservationID.
-func (r *ReservationRepository) GetById(ctx context.Context, id uuid.UUID) (*model.Reservation, error) {
+func (r *ReservationRepository) GetById(
+	ctx context.Context,
+	id uuid.UUID,
+) (*model.Reservation, error) {
 	query := `SELECT * FROM reservations WHERE reservation_id = $1`
-	res, err := r.getReservation(ctx, query, id)
+	res, err := r.getReservation(ctx, query, nil, id)
+	if err != nil {
+		return nil, fmt.Errorf("get reservation by id: %w", err)
+	}
+	return res, nil
+}
+
+// GetByIdForUpdate returns a reservation by its reservationID with FOR UPDATE lock.
+func (r *ReservationRepository) GetByIdForUpdate(
+	ctx context.Context,
+	id uuid.UUID,
+	uow *uow.UnitOfWork,
+) (*model.Reservation, error) {
+	query := `SELECT * FROM reservations WHERE reservation_id = $1 FOR UPDATE`
+	res, err := r.getReservation(ctx, query, uow, id)
 	if err != nil {
 		return nil, fmt.Errorf("get reservation by id: %w", err)
 	}
@@ -147,7 +165,7 @@ func (r *ReservationRepository) GetById(ctx context.Context, id uuid.UUID) (*mod
 // GetByQuoteId returns a reservation by its quoteID.
 func (r *ReservationRepository) GetByQuoteId(ctx context.Context, quoteId string) (*model.Reservation, error) {
 	query := `SELECT * FROM reservations WHERE quote_id = $1`
-	res, err := r.getReservation(ctx, query, quoteId)
+	res, err := r.getReservation(ctx, query, nil, quoteId)
 	if err != nil {
 		return nil, fmt.Errorf("get reservation by quote_id failed with error: %w", err)
 	}
@@ -157,7 +175,7 @@ func (r *ReservationRepository) GetByQuoteId(ctx context.Context, quoteId string
 // GetByOrderId returns a reservation by its orderID.
 func (r *ReservationRepository) GetByOrderId(ctx context.Context, orderId string) (*model.Reservation, error) {
 	query := `SELECT * FROM reservations WHERE order_id = $1`
-	res, err := r.getReservation(ctx, query, orderId)
+	res, err := r.getReservation(ctx, query, nil, orderId)
 	if err != nil {
 		return nil, fmt.Errorf("get reservation by order_id failed with error: %w", err)
 	}
@@ -198,7 +216,6 @@ func (r *ReservationRepository) SelectReservationsByQuery(
 		where = append(where, fmt.Sprintf("expires_at <= $%d", argPos))
 		args = append(args, *query.ExpiresAtGte)
 		argPos++
-		fmt.Printf("ExpiresAtGte: %v\n", *query.ExpiresAtGte)
 	}
 	if query.UpdatedAtLt != nil {
 		where = append(where, fmt.Sprintf("updated_at < $%d", argPos))
@@ -251,9 +268,17 @@ func (r *ReservationRepository) SelectReservationsByQuery(
 func (r *ReservationRepository) getReservation(
 	ctx context.Context,
 	query string,
+	uow *uow.UnitOfWork,
 	args ...any,
 ) (*model.Reservation, error) {
-	row := r.db.QueryRowContext(ctx, query, args...)
+	var exec SQLExecutor
+	if uow != nil && uow.GetTransaction() != nil {
+		exec = uow.GetTransaction()
+	} else {
+		exec = r.db
+	}
+
+	row := exec.QueryRowContext(ctx, query, args...)
 	res := &model.Reservation{}
 	err := row.Scan(
 		&res.ReservationId,

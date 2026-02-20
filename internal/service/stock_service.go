@@ -12,14 +12,14 @@ import (
 // StockServiceInterface defines business operations for stock management
 type StockServiceInterface interface {
 	CreateStock(ctx context.Context, req apimodel.StockRequest) (*model.Stock, error)
-	GetStockBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error)
+	GetStockBySku(ctx context.Context, sku string) (*apimodel.StockResponse, error)
 	GetStockBySkuForUpdate(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error)
 	GetStocks(
 		ctx context.Context,
 		requestedLimit,
 		requestedOffset int,
 	) (
-		stocks []*model.Stock,
+		stocksResp []*apimodel.StockResponse,
 		pagination *apimodel.PaginationResponse,
 		message string,
 		err error,
@@ -63,8 +63,18 @@ func (ss *StockService) CreateStock(ctx context.Context, req apimodel.StockReque
 }
 
 // GetStockBySku returns a stock item by its SKU.
-func (ss *StockService) GetStockBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error) {
-	return ss.repo.GetBySku(ctx, sku, uow)
+func (ss *StockService) GetStockBySku(ctx context.Context, sku string) (*apimodel.StockResponse, error) {
+	stock, err := ss.repo.GetBySku(ctx, sku)
+	if err != nil {
+		return nil, err
+	}
+	resp := apimodel.StockResponse{
+		SKU:       stock.SKU,
+		OnHand:    stock.OnHand,
+		Reserved:  stock.Reserved,
+		Available: ss.CalculateAvailability(ctx, stock),
+	}
+	return &resp, nil
 }
 
 // GetStockBySkuForUpdate returns a stock item by its SKU with a FOR UPDATE lock.
@@ -78,14 +88,14 @@ func (ss *StockService) GetStocks(
 	requestedLimit,
 	requestedOffset int,
 ) (
-	stocks []*model.Stock,
+	stocksResp []*apimodel.StockResponse,
 	pagination *apimodel.PaginationResponse,
 	message string,
 	err error,
 ) {
 	// Apply business rules to pagination parameters
 	params := apimodel.NewPaginationParams(requestedLimit, requestedOffset)
-	stocks, err = ss.repo.GetStocks(ctx, params.Limit, params.Offset)
+	stocks, err := ss.repo.GetStocks(ctx, params.Limit, params.Offset)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -97,7 +107,16 @@ func (ss *StockService) GetStocks(
 
 	if totalCount == 0 {
 		message = "No stocks found"
-		return []*model.Stock{}, nil, message, nil
+		return []*apimodel.StockResponse{}, nil, message, nil
+	}
+
+	for _, stock := range stocks {
+		stocksResp = append(stocksResp, &apimodel.StockResponse{
+			SKU:       stock.SKU,
+			OnHand:    stock.OnHand,
+			Reserved:  stock.Reserved,
+			Available: ss.CalculateAvailability(ctx, stock),
+		})
 	}
 
 	currentPage := params.Offset/params.Limit + 1
@@ -105,7 +124,7 @@ func (ss *StockService) GetStocks(
 
 	if currentPage > totalPages {
 		message = fmt.Sprintf("Page %d does not exist. Total pages: %d", currentPage, totalPages)
-		return []*model.Stock{}, nil, message, nil
+		return []*apimodel.StockResponse{}, nil, message, nil
 	}
 
 	pagination = &apimodel.PaginationResponse{
@@ -118,7 +137,7 @@ func (ss *StockService) GetStocks(
 
 	message = fmt.Sprintf("Page %d of %d", currentPage, totalPages)
 
-	return stocks, pagination, message, nil
+	return stocksResp, pagination, message, nil
 }
 
 // AdjustInventory updates the stock quantity for a given SKU.
@@ -133,6 +152,9 @@ func (ss *StockService) ReserveStock(ctx context.Context, sku string, qty int, u
 		return nil, err
 	}
 	newReserved := stock.Reserved + qty
+	if newReserved < 0 {
+		return nil, fmt.Errorf("cannot reserve negative quantity of stock item SKU: %s", stock.SKU)
+	}
 	req := apimodel.StockRequest{
 		SKU:      sku,
 		Reserved: &newReserved,

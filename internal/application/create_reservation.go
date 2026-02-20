@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
+	"go-inventory-reservations/internal/uow"
 )
 
 // CreateReservation orchestrates the process of creating a reservation.
@@ -17,56 +18,51 @@ func (ro *ReservationOrchestrator) CreateReservation(
 	result := apimodel.ReservationResponse{Items: make(map[string]*model.ReservationItem)}
 
 	items := params.Items
-	// Check if there are enough stock items for all items in the reservation
-	for _, item := range items {
-		stock, err := ro.stockService.GetStockBySku(ctx, item.SKU)
+
+	err := ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+		// Check if there are enough stock items for all items in the reservation
+		for _, item := range items {
+			if item.Quantity == 0 {
+				return fmt.Errorf("quantity must be greater than 0")
+			}
+			stock, err := ro.stockService.GetStockBySkuForUpdate(ctx, item.SKU, unit)
+			if err != nil {
+				return err
+			}
+			if ro.stockService.CalculateAvailability(ctx, stock) < item.Quantity {
+				return fmt.Errorf("insufficient stock for SKU %s", item.SKU)
+			}
+		}
+
+		// Create reservation
+		reservation, err := ro.reservationService.CreateReservationHelper(ctx, params, unit)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if ro.stockService.CalculateAvailability(ctx, stock) < item.Quantity {
-			return nil, fmt.Errorf("insufficient stock for SKU %s", item.SKU)
+		result.Reservation = reservation
+
+		for _, item := range items {
+			// Create reservation items
+			createdItem, err := ro.reservationItemService.CreateReservationItem(
+				ctx,
+				item,
+				reservation.ReservationId,
+				unit,
+			)
+			if err != nil {
+				return err
+			}
+
+			result.Items[item.SKU] = createdItem
+
+			// Update stock reserved quantity
+			_, err = ro.stockService.ReserveStock(ctx, item.SKU, item.Quantity, unit)
+			if err != nil {
+				return err
+			}
 		}
-	}
-
-	unit, err := ro.uowManager.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			unit.Rollback()
-		}
-	}()
-
-	// Create reservation
-	reservation, err := ro.reservationService.CreateReservation(ctx, params, unit)
-	result.Reservation = reservation
-	if err != nil {
-		return nil, err
-	}
-
-	for _, item := range items {
-		// Create reservation items
-		createdItem, err := ro.reservationItemService.CreateReservationItem(
-			ctx,
-			item,
-			reservation.ReservationId,
-			unit,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		result.Items[item.SKU] = createdItem
-
-		// Update stock reserved quantity
-		_, err = ro.stockService.ReserveStock(ctx, item.SKU, item.Quantity, unit)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	err = unit.Commit()
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}

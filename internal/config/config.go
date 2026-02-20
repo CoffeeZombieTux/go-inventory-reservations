@@ -13,6 +13,7 @@ type Config struct {
 	Server                  ServerConfig
 	QuoteExpirationSettings QuoteExpirationSettings
 	ArchiveSettings         ArchiveSettings
+	ReservationItemSettings ReservationItemSettings
 }
 
 // DatabaseConfig represents the database configuration
@@ -51,6 +52,11 @@ type ArchiveSettings struct {
 	Limit                        int
 }
 
+// ReservationItemSettings represents reservation item constraints.
+type ReservationItemSettings struct {
+	MaxQuantity int
+}
+
 // Load loads the application configuration from environment variables
 func Load() (*Config, error) {
 	config := &Config{
@@ -79,6 +85,9 @@ func Load() (*Config, error) {
 			ArchiveReservationsAfterDays: getEnvInt("ARCHIVE_RESERVATIONS_AFTER_DAYS", 30),
 			ArchiveReservationsCronSpec:  getEnv("ARCHIVE_RESERVATIONS_CRON_SPEC", "0 4 * * *"),
 			Limit:                        getEnvInt("ARCHIVE_RESERVATIONS_COUNT_LIMIT", 10000),
+		},
+		ReservationItemSettings: ReservationItemSettings{
+			MaxQuantity: getEnvInt("RESERVATION_ITEM_MAX_QUANTITY", 20),
 		},
 	}
 

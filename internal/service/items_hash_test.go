@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestBuildReservationItemsHashFromRequests_OrderIndependent verifies hash stability for reordered items.
 func TestBuildReservationItemsHashFromRequests_OrderIndependent(t *testing.T) {
 	itemsA := []apimodel.ReservationItemRequest{
 		{SKU: "SKU-2", Quantity: 1},
@@ -26,6 +27,7 @@ func TestBuildReservationItemsHashFromRequests_OrderIndependent(t *testing.T) {
 	}
 }
 
+// TestBuildReservationItemsHashFromRequests_DuplicateSKUAggregated verifies duplicate SKU quantities are aggregated.
 func TestBuildReservationItemsHashFromRequests_DuplicateSKUAggregated(t *testing.T) {
 	itemsA := []apimodel.ReservationItemRequest{
 		{SKU: "SKU-1", Quantity: 1},
@@ -48,6 +50,7 @@ func TestBuildReservationItemsHashFromRequests_DuplicateSKUAggregated(t *testing
 	}
 }
 
+// TestBuildReservationItemsHashFromRequests_IgnoresNonPositive verifies non-positive quantities are ignored.
 func TestBuildReservationItemsHashFromRequests_IgnoresNonPositive(t *testing.T) {
 	items := []apimodel.ReservationItemRequest{
 		{SKU: "SKU-1", Quantity: 0},

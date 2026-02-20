@@ -2,11 +2,12 @@ package handler
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"go-inventory-reservations/internal/logger"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/service"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 // AdminHandler handles all admin-related routes, e.g. stock management, etc.
