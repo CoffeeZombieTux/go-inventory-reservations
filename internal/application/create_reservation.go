@@ -19,7 +19,7 @@ func (ro *ReservationOrchestrator) CreateReservation(
 
 	items := params.Items
 
-	err := ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+	err := uow.WithUnitOfWork(ctx, ro.uowManager, func(unit *uow.UnitOfWork) error {
 		// Check if there are enough stock items for all items in the reservation
 		for _, item := range items {
 			if item.Quantity == 0 {

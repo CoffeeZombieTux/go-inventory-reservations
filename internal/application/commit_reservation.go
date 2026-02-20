@@ -17,7 +17,7 @@ func (ro *ReservationOrchestrator) CommitReservation(
 	params apimodel.CommitReservationRequest,
 ) (*model.Reservation, error) {
 	var reservation *model.Reservation
-	err := ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+	err := uow.WithUnitOfWork(ctx, ro.uowManager, func(unit *uow.UnitOfWork) error {
 		// Update reservation
 		var err error
 		reservation, err = ro.reservationService.CommitReservationHelper(ctx, params, unit)

@@ -69,8 +69,14 @@ func New() (*Kernel, error) {
 		reservationItemService,
 	)
 
+	adminStockOrchestrator := application.NewAdminStockOrchestrator(
+		unitOfWork,
+		stockService,
+		reservationItemService,
+	)
+
 	// Handlers (with all required services)
-	handlersPool := handler.NewHandlersPool(reservationOrchestrator, stockService, reservationService, log)
+	handlersPool := handler.NewHandlersPool(reservationOrchestrator, adminStockOrchestrator, stockService, reservationService, log)
 
 	// Gin router and HTTP server setup
 	routerEngine := gin.Default()

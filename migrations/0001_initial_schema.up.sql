@@ -22,7 +22,7 @@ CREATE TABLE reservations (
 
 CREATE TABLE reservation_items (
     reservation_id UUID NOT NULL REFERENCES reservations(reservation_id) ON DELETE CASCADE,
-    sku TEXT NOT NULL,
+    sku TEXT NOT NULL REFERENCES stock(sku) ON DELETE CASCADE,
     qty INT NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     PRIMARY KEY (reservation_id, sku)

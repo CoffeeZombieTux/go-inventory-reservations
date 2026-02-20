@@ -20,7 +20,7 @@ func (ro *ReservationOrchestrator) UpdateReservation(
 ) (*apimodel.ReservationResponse, error) {
 	result := apimodel.ReservationResponse{Items: make(map[string]*model.ReservationItem)}
 
-	err := ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+	err := uow.WithUnitOfWork(ctx, ro.uowManager, func(unit *uow.UnitOfWork) error {
 		// Update reservation
 		reservation, err := ro.reservationService.UpdateReservationHelper(ctx, params, unit)
 		if err != nil {

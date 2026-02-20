@@ -12,7 +12,7 @@ import (
 // It updates the stock inventory and updates the reservation status.
 // It also deletes the reservation items.
 func (ro *ReservationOrchestrator) ReleaseReservation(ctx context.Context, id uuid.UUID) error {
-	return ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+	return uow.WithUnitOfWork(ctx, ro.uowManager, func(unit *uow.UnitOfWork) error {
 		// Update reservation status
 		reservation, err := ro.reservationService.ReleaseReservationHelper(ctx, id, unit)
 		if err != nil {

@@ -41,3 +41,7 @@ Content-Type: application/json
 ### Get Stocks with pagination default values limit=50&offset=0
 GET http://localhost:8080/stock
 Content-Type: application/json
+
+### Get Active Reservation Items by SKU (admin) with pagination
+GET http://localhost:8080/admin/stock/{{sku1}}/reservation-items?limit=10&offset=0
+Content-Type: application/json

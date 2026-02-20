@@ -14,6 +14,7 @@ import (
 type ReservationItemsRepositoryInterface interface {
 	Get(ctx context.Context, reservationId uuid.UUID, sku string, uow *uow.UnitOfWork) (*model.ReservationItem, error)
 	FindByReservationId(ctx context.Context, reservationId uuid.UUID, uow *uow.UnitOfWork) (map[string]*model.ReservationItem, error)
+	FindActiveBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (map[string]*model.ReservationItem, error)
 	Create(ctx context.Context, item *model.ReservationItem, uow *uow.UnitOfWork) (*model.ReservationItem, error)
 	Update(ctx context.Context, item *model.ReservationItem, uow *uow.UnitOfWork) (*model.ReservationItem, error)
 	SetIsActive(ctx context.Context, reservationId uuid.UUID, sku string, isActive bool, uow *uow.UnitOfWork) (*model.ReservationItem, error)
@@ -88,6 +89,45 @@ func (rir *ReservationItemsRepository) FindByReservationId(
 			return nil, fmt.Errorf("failed to scan reservation item: %w", err)
 		}
 		items[item.SKU] = &item
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating reservation items rows: %w", err)
+	}
+	return items, nil
+}
+
+// FindActiveBySku retrieves active reservation items for a given SKU.
+func (rir *ReservationItemsRepository) FindActiveBySku(
+	ctx context.Context,
+	sku string,
+	uow *uow.UnitOfWork,
+) (map[string]*model.ReservationItem, error) {
+	var exec SQLExecutor
+	if uow != nil && uow.GetTransaction() != nil {
+		exec = uow.GetTransaction()
+	} else {
+		exec = rir.db
+	}
+
+	query := `
+		SELECT reservation_id, sku, qty, is_active
+		FROM reservation_items
+		WHERE sku = $1 AND is_active = true
+	`
+
+	rows, err := exec.QueryContext(ctx, query, sku)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query reservation items: %w", err)
+	}
+	defer rows.Close()
+
+	items := make(map[string]*model.ReservationItem)
+	for rows.Next() {
+		var item model.ReservationItem
+		if err := rows.Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive); err != nil {
+			return nil, fmt.Errorf("failed to scan reservation item: %w", err)
+		}
+		items[item.ReservationId.String()] = &item
 	}
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating reservation items rows: %w", err)

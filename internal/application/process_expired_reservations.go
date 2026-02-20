@@ -31,7 +31,7 @@ func (ro *ReservationOrchestrator) processExpiredReservation(
 	ctx context.Context,
 	reservation *model.Reservation,
 ) error {
-	err := ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+	err := uow.WithUnitOfWork(ctx, ro.uowManager, func(unit *uow.UnitOfWork) error {
 		err := ro.reservationService.ExpireReservationHelper(ctx, reservation, unit)
 		if err != nil {
 			if service.IsReservationVersionConflict(err) {

@@ -46,3 +46,31 @@ func (u *UnitOfWork) Commit() error {
 func (u *UnitOfWork) Rollback() error {
 	return u.tx.Rollback()
 }
+
+// WithUnitOfWork executes fn in a transaction and commits on success.
+func WithUnitOfWork(
+	ctx context.Context,
+	uowManager *UnitOfWorkManager,
+	fn func(unit *UnitOfWork) error,
+) (err error) {
+	unit, err := uowManager.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			_ = unit.Rollback()
+			panic(panicErr)
+		}
+		if err != nil {
+			_ = unit.Rollback()
+		}
+	}()
+
+	err = fn(unit)
+	if err != nil {
+		return err
+	}
+
+	return unit.Commit()
+}

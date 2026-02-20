@@ -12,7 +12,8 @@ func (ro *ReservationOrchestrator) RevertReservation(
 	ctx context.Context,
 	request apimodel.RevertReservationRequest,
 ) error {
-	return ro.withUnitOfWork(ctx, func(unit *uow.UnitOfWork) error {
+	return uow.WithUnitOfWork(ctx, ro.uowManager, func(unit *uow.UnitOfWork) error {
+
 		// Update reservation
 		reservation, err := ro.reservationService.RevertReservationHelper(ctx, request, unit)
 		if err != nil {

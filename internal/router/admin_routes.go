@@ -11,4 +11,5 @@ func setupAdminRoutes(engine *gin.Engine, handlersPool handler.HandlersPool) {
 	admin.POST("/stock", handlersPool.Admin.CreateStock)
 	admin.PUT("/stock", handlersPool.Admin.UpdateStock)
 	admin.DELETE("/stock/:sku", handlersPool.Admin.DeleteStock)
+	admin.GET("/stock/:sku/reservation-items", handlersPool.Admin.GetActiveReservationItemsBySku)
 }

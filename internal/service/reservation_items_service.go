@@ -16,6 +16,7 @@ import (
 type ReservationItemsServiceInterface interface {
 	GetReservationItem(ctx context.Context, reservationId uuid.UUID, sku string, uow *uow.UnitOfWork) (*model.ReservationItem, error)
 	GetReservationItems(ctx context.Context, reservationId uuid.UUID, uow *uow.UnitOfWork) (map[string]*model.ReservationItem, error)
+	GetActiveReservationItemsBySku(ctx context.Context, sku string, uow *uow.UnitOfWork) (map[string]*model.ReservationItem, error)
 	CreateReservationItem(ctx context.Context, request apimodel.ReservationItemRequest, reservationId uuid.UUID, uow *uow.UnitOfWork) (*model.ReservationItem, error)
 	UpdateReservationItem(ctx context.Context, request apimodel.ReservationItemRequest, reservationId uuid.UUID, uow *uow.UnitOfWork) (*model.ReservationItem, error)
 	SetReservationItemActive(ctx context.Context, reservationId uuid.UUID, sku string, isActive bool, uow *uow.UnitOfWork) (*model.ReservationItem, error)
@@ -60,6 +61,19 @@ func (ris ReservationItemsService) GetReservationItems(
 	uow *uow.UnitOfWork,
 ) (map[string]*model.ReservationItem, error) {
 	reservationItems, err := ris.repo.FindByReservationId(ctx, reservationId, uow)
+	if err != nil {
+		return nil, err
+	}
+	return reservationItems, nil
+}
+
+// GetReservationItemsBySku retrieves all reservation items for a given SKU using the provided context and unit of work if available.
+func (ris ReservationItemsService) GetActiveReservationItemsBySku(
+	ctx context.Context,
+	sku string,
+	uow *uow.UnitOfWork,
+) (map[string]*model.ReservationItem, error) {
+	reservationItems, err := ris.repo.FindActiveBySku(ctx, sku, uow)
 	if err != nil {
 		return nil, err
 	}
