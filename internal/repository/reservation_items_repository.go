@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
 	"github.com/google/uuid"
+	"go-inventory-reservations/internal/apperror"
+	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/model"
 	"go-inventory-reservations/internal/uow"
 )
@@ -23,12 +23,13 @@ type ReservationItemsRepositoryInterface interface {
 
 // ReservationItemsRepository is a repository for reservation items management.
 type ReservationItemsRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *logger.Logger
 }
 
 // NewReservationItemsRepository creates a new ReservationItemsRepository instance.
-func NewReservationItemsRepository(db *sql.DB) *ReservationItemsRepository {
-	return &ReservationItemsRepository{db: db}
+func NewReservationItemsRepository(db *sql.DB, log *logger.Logger) *ReservationItemsRepository {
+	return &ReservationItemsRepository{db: db, logger: log}
 }
 
 // Get retrieves a reservation item by reservation ID and SKU using the provided context and unit of work if available.
@@ -51,9 +52,14 @@ func (rir *ReservationItemsRepository) Get(
 		WHERE reservation_id = $1 AND sku = $2
 	`
 	var item model.ReservationItem
-	err := exec.QueryRowContext(ctx, query, reservationId, sku).Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive)
+	err := exec.QueryRowContext(
+		ctx,
+		query,
+		reservationId,
+		sku,
+	).Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get reservation item: %w", err)
+		return nil, apperror.FromDB(err, "Failed to get reservation item", apperror.CodeInternalError)
 	}
 	return &item, nil
 }
@@ -78,20 +84,27 @@ func (rir *ReservationItemsRepository) FindByReservationId(
 	`
 	rows, err := exec.QueryContext(ctx, query, reservationId)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query reservation items: %w", err)
+		return nil, apperror.FromDB(err, "Failed to query reservation items", apperror.CodeInternalError)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			rir.logger.WithError(closeErr).WithFields(logger.Fields{
+				"repository": "ReservationItemsRepository",
+				"method":     "FindByReservationId",
+			}).Error(logger.LogMessageFailedToCloseRows)
+		}
+	}()
 
 	items := make(map[string]*model.ReservationItem)
 	for rows.Next() {
 		var item model.ReservationItem
 		if err := rows.Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive); err != nil {
-			return nil, fmt.Errorf("failed to scan reservation item: %w", err)
+			return nil, apperror.FromDB(err, "Failed to scan reservation item", apperror.CodeInternalError)
 		}
 		items[item.SKU] = &item
 	}
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating reservation items rows: %w", err)
+		return nil, apperror.FromDB(err, "Failed to iterate reservation item rows", apperror.CodeInternalError)
 	}
 	return items, nil
 }
@@ -117,20 +130,27 @@ func (rir *ReservationItemsRepository) FindActiveBySku(
 
 	rows, err := exec.QueryContext(ctx, query, sku)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query reservation items: %w", err)
+		return nil, apperror.FromDB(err, "Failed to query reservation items", apperror.CodeInternalError)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			rir.logger.WithError(closeErr).WithFields(logger.Fields{
+				"repository": "ReservationItemsRepository",
+				"method":     "FindActiveBySku",
+			}).Error(logger.LogMessageFailedToCloseRows)
+		}
+	}()
 
 	items := make(map[string]*model.ReservationItem)
 	for rows.Next() {
 		var item model.ReservationItem
 		if err := rows.Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive); err != nil {
-			return nil, fmt.Errorf("failed to scan reservation item: %w", err)
+			return nil, apperror.FromDB(err, "Failed to scan reservation item", apperror.CodeInternalError)
 		}
 		items[item.ReservationId.String()] = &item
 	}
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating reservation items rows: %w", err)
+		return nil, apperror.FromDB(err, "Failed to iterate reservation item rows", apperror.CodeInternalError)
 	}
 
 	return items, nil
@@ -156,7 +176,7 @@ func (rir *ReservationItemsRepository) Create(
 	`
 	_, err := exec.ExecContext(ctx, query, item.ReservationId, item.SKU, item.Qty, item.IsActive)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create reservation item: %w", err)
+		return nil, apperror.FromDB(err, "Failed to create reservation item", apperror.CodeInternalError)
 	}
 
 	return item, nil
@@ -184,14 +204,7 @@ func (rir *ReservationItemsRepository) Update(
 
 	err := exec.QueryRowContext(ctx, query, item.ReservationId, item.Qty, item.IsActive, item.SKU).Scan(&item.Qty, &item.IsActive)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf(
-				"reservation item not found for ReservationID %s and SKU: %s",
-				item.ReservationId,
-				item.SKU,
-			)
-		}
-		return nil, fmt.Errorf("failed to update reservation item: %w", err)
+		return nil, apperror.FromDB(err, "Failed to update reservation item", apperror.CodeInternalError)
 	}
 	return item, nil
 }
@@ -222,10 +235,7 @@ func (rir *ReservationItemsRepository) SetIsActive(
 	err := exec.QueryRowContext(ctx, query, reservationId, sku, isActive).
 		Scan(&item.ReservationId, &item.SKU, &item.Qty, &item.IsActive)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("reservation item not found for ReservationID %s and SKU: %s", reservationId, sku)
-		}
-		return nil, fmt.Errorf("failed to update reservation item active flag: %w", err)
+		return nil, apperror.FromDB(err, "Failed to update reservation item active flag", apperror.CodeInternalError)
 	}
 	return &item, nil
 }
@@ -247,10 +257,7 @@ func (rir *ReservationItemsRepository) Delete(
 	var deletedItem model.ReservationItem
 	err := exec.QueryRowContext(ctx, query, reservationId, sku).Scan(&deletedItem.ReservationId, &deletedItem.SKU)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("reservation item not found for ReservationID %s and SKU: %s", reservationId, sku)
-		}
-		return fmt.Errorf("failed to update reservation item: %w", err)
+		return apperror.FromDB(err, "Failed to delete reservation item", apperror.CodeInternalError)
 	}
 	return nil
 }

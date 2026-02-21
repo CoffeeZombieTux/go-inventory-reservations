@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"go-inventory-reservations/internal/apperror"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/service"
@@ -54,9 +55,10 @@ func (a AdminStockOrchestrator) DeleteStock(ctx context.Context, sku string) err
 		return err
 	}
 	if len(reservationItems) > 0 {
-		return fmt.Errorf("cannot delete stock item SKU: %s, it is currently reserved by %d reservations",
-			sku,
-			len(reservationItems),
+		return apperror.New(
+			apperror.CodeValidationError,
+			"Cannot delete stock because it is reserved",
+			"sku "+sku+" is reserved by "+fmt.Sprintf("%d", len(reservationItems))+" reservations",
 		)
 	}
 	return a.stockService.DeleteStock(ctx, sku)
@@ -75,7 +77,11 @@ func (a AdminStockOrchestrator) AdjustInventory(
 		}
 
 		if req.OnHand != nil && *req.OnHand < stock.Reserved {
-			return fmt.Errorf("cannot reduce OnHand below Reserved quantity")
+			return apperror.New(
+				apperror.CodeValidationError,
+				"Cannot reduce on_hand below reserved quantity",
+				"on_hand must be >= reserved",
+			)
 		}
 
 		result, err = a.stockService.AdjustInventory(ctx, req, unit)
@@ -126,7 +132,10 @@ func (a AdminStockOrchestrator) GetActiveReservationItemsBySku(
 	currentPage := params.Offset/params.Limit + 1
 	totalPages := (totalCount + params.Limit - 1) / params.Limit
 	if currentPage > totalPages {
-		return []*model.ReservationItem{}, nil, fmt.Sprintf("Page %d does not exist. Total pages: %d", currentPage, totalPages), nil
+		return []*model.ReservationItem{},
+			nil,
+			fmt.Sprintf("Page %d does not exist. Total pages: %d", currentPage, totalPages),
+			nil
 	}
 
 	start := params.Offset

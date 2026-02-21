@@ -9,7 +9,7 @@ import (
 // Reservation represents a reservation of inventory items
 type Reservation struct {
 	ReservationId uuid.UUID  `db:"reservation_id" json:"reservation_id"` // Primary key for the reservation
-	Status        string     `db:"status" json:"status"`                 // Status of the reservation (PENDING, COMMITTED, RELEASED, EXPIRED)
+	Status        string     `db:"status" json:"status"`                 // Status of the reservation ('PENDING','COMMITTED','RELEASED','EXPIRED','RESERVED','REVERTED')
 	QuoteId       string     `db:"quote_id" json:"quote_id"`             // Quote Id reference
 	OrderId       *string    `db:"order_id" json:"order_id"`             // Order Id reference (can be NULL)
 	ExpiresAt     *time.Time `db:"expires_at" json:"expires_at"`         // Expiration timestamp  (can be NULL)

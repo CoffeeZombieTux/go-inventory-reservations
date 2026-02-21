@@ -11,6 +11,9 @@ type Logger struct {
 	*logrus.Logger
 }
 
+// Fields aliases log field maps so callers don't need to import logrus directly.
+type Fields = logrus.Fields
+
 // New creates a new Logger instance
 func New(level, format string) *Logger {
 	log := logrus.New()
@@ -47,6 +50,6 @@ func (l *Logger) WithField(key string, value interface{}) *logrus.Entry {
 }
 
 // WithFields adds multiple fields to the logger
-func (l *Logger) WithFields(fields logrus.Fields) *logrus.Entry {
+func (l *Logger) WithFields(fields Fields) *logrus.Entry {
 	return l.Logger.WithFields(fields)
 }

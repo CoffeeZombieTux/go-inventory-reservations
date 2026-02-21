@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"go-inventory-reservations/internal/apperror"
+	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/uow"
@@ -32,12 +34,13 @@ type ReservationRepositoryInterface interface {
 
 // ReservationRepository is a repository for reservation management.
 type ReservationRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *logger.Logger
 }
 
 // NewReservationRepository creates a new ReservationRepository instance.
-func NewReservationRepository(db *sql.DB) *ReservationRepository {
-	return &ReservationRepository{db: db}
+func NewReservationRepository(db *sql.DB, log *logger.Logger) *ReservationRepository {
+	return &ReservationRepository{db: db, logger: log}
 }
 
 // Save inserts a reservation into the database or updates it if it already exists.
@@ -83,7 +86,7 @@ func (r *ReservationRepository) createReservation(
 		reservation.ItemsHash,
 	).Scan(&reservation.ReservationId, &reservation.CreatedAt, &reservation.UpdatedAt, &reservation.Version)
 	if err != nil {
-		return nil, fmt.Errorf("save reservation create failed: %w", err)
+		return nil, apperror.FromDB(err, "Failed to create reservation", apperror.CodeInternalError)
 	}
 
 	return reservation, nil
@@ -124,15 +127,15 @@ func (r *ReservationRepository) updateReservationWithVersion(
 	}
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf(
+		return nil, apperror.Wrap(fmt.Errorf(
 			"%w: reservation_id=%s expected_version=%d",
 			ErrReservationVersionConflict,
 			reservation.ReservationId,
 			reservation.Version,
-		)
+		), apperror.CodeReservationVersionConflict, "Reservation version conflict")
 	}
 
-	return nil, fmt.Errorf("save reservation update failed: %w", err)
+	return nil, apperror.FromDB(err, "Failed to update reservation", apperror.CodeInternalError)
 }
 
 // GetById returns a reservation by its reservationID.
@@ -143,7 +146,7 @@ func (r *ReservationRepository) GetById(
 	query := `SELECT * FROM reservations WHERE reservation_id = $1`
 	res, err := r.getReservation(ctx, query, nil, id)
 	if err != nil {
-		return nil, fmt.Errorf("get reservation by id: %w", err)
+		return nil, err
 	}
 	return res, nil
 }
@@ -157,7 +160,7 @@ func (r *ReservationRepository) GetByIdForUpdate(
 	query := `SELECT * FROM reservations WHERE reservation_id = $1 FOR UPDATE`
 	res, err := r.getReservation(ctx, query, uow, id)
 	if err != nil {
-		return nil, fmt.Errorf("get reservation by id: %w", err)
+		return nil, err
 	}
 	return res, nil
 }
@@ -167,7 +170,7 @@ func (r *ReservationRepository) GetByQuoteId(ctx context.Context, quoteId string
 	query := `SELECT * FROM reservations WHERE quote_id = $1`
 	res, err := r.getReservation(ctx, query, nil, quoteId)
 	if err != nil {
-		return nil, fmt.Errorf("get reservation by quote_id failed with error: %w", err)
+		return nil, err
 	}
 	return res, nil
 }
@@ -177,7 +180,7 @@ func (r *ReservationRepository) GetByOrderId(ctx context.Context, orderId string
 	query := `SELECT * FROM reservations WHERE order_id = $1`
 	res, err := r.getReservation(ctx, query, nil, orderId)
 	if err != nil {
-		return nil, fmt.Errorf("get reservation by order_id failed with error: %w", err)
+		return nil, err
 	}
 	return res, nil
 }
@@ -187,15 +190,19 @@ func (r *ReservationRepository) Delete(ctx context.Context, id uuid.UUID) error 
 	query := `DELETE FROM reservations WHERE reservation_id = $1`
 	res, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("delete reservation by id: %w", err)
+		return apperror.FromDB(err, "Failed to delete reservation", apperror.CodeInternalError)
 	}
 
 	affected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("delete reservation by id: %w", err)
+		return apperror.Wrap(err, apperror.CodeInternalError, "Failed to delete reservation")
 	}
 	if affected == 0 {
-		return fmt.Errorf("reservation not found with id: %s", id)
+		return apperror.New(
+			apperror.CodeDBNoRowsCode,
+			apperror.CodeDBNoRowsMessage,
+			"reservation not found with id: "+id.String(),
+		)
 	}
 	return nil
 }
@@ -239,9 +246,16 @@ func (r *ReservationRepository) SelectReservationsByQuery(
 
 	rows, err := r.db.QueryContext(ctx, sql, args...)
 	if err != nil {
-		return nil, err
+		return nil, apperror.FromDB(err, "Failed to list reservations", apperror.CodeInternalError)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			r.logger.WithError(closeErr).WithFields(logger.Fields{
+				"repository": "ReservationRepository",
+				"method":     "SelectReservationsByQuery",
+			}).Error(logger.LogMessageFailedToCloseRows)
+		}
+	}()
 
 	var reservations []*model.Reservation
 	for rows.Next() {
@@ -257,11 +271,14 @@ func (r *ReservationRepository) SelectReservationsByQuery(
 			&res.ItemsHash,
 			&res.Version,
 		); err != nil {
-			return nil, err
+			return nil, apperror.FromDB(err, "Failed to scan reservation", apperror.CodeInternalError)
 		}
 		reservations = append(reservations, &res)
 	}
-	return reservations, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, apperror.FromDB(err, "Failed to iterate reservation rows", apperror.CodeInternalError)
+	}
+	return reservations, nil
 }
 
 // getReservation returns a reservation by the given query.
@@ -292,11 +309,11 @@ func (r *ReservationRepository) getReservation(
 		&res.Version,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("no reservation found for query: %s", query) // Not found
+		return nil, apperror.New(apperror.CodeDBNoRowsCode, apperror.CodeDBNoRowsMessage, "no reservation found for query")
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to scan reservation: %w", err)
+		return nil, apperror.FromDB(err, "Failed to scan reservation", apperror.CodeInternalError)
 	}
 
 	return res, nil

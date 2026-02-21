@@ -22,5 +22,5 @@ func TestPingRoute(t *testing.T) {
 	engine.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.JSONEq(t, `{"message":"pong"}`, resp.Body.String())
+	assert.JSONEq(t, `{"success":true,"message":"pong"}`, resp.Body.String())
 }

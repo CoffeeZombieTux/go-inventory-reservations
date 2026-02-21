@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"fmt"
+	"go-inventory-reservations/internal/apperror"
 	"go-inventory-reservations/internal/application"
 	"go-inventory-reservations/internal/logger"
 	apimodel "go-inventory-reservations/internal/model/api"
@@ -37,20 +37,21 @@ func (ah *AdminHandler) CreateStock(ctx *gin.Context) {
 	var req apimodel.StockRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format: " + err.Error(),
-		})
+		writeBindError(ctx, err)
 		return
 	}
 
 	stock, err := ah.stockService.CreateStock(ctx, req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to create stock: " + err.Error(),
-		})
+		ah.logger.WithError(err).WithFields(logger.Fields{
+			"request_id": requestIDFromContext(ctx),
+			"sku":        req.SKU,
+		}).Error(logger.LogMessageFailedToCreateStock)
+		status, code, message, details := mapDomainError(err)
+		writeError(ctx, status, message, code, details)
 		return
 	}
-	ctx.JSON(http.StatusOK, stock)
+	writeSuccess(ctx, http.StatusOK, "Stock created", stock)
 }
 
 // UpdateStock updates the stock quantity for a given SKU.
@@ -58,52 +59,60 @@ func (ah *AdminHandler) UpdateStock(ctx *gin.Context) {
 	var req apimodel.StockRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format: " + err.Error(),
-		})
+		writeBindError(ctx, err)
 		return
 	}
 
 	stock, err := ah.adminStockOrchestrator.AdjustInventory(ctx, req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to update stock qty: " + err.Error(),
-		})
+		ah.logger.WithError(err).WithFields(logger.Fields{
+			"request_id": requestIDFromContext(ctx),
+			"sku":        req.SKU,
+		}).Error(logger.LogMessageFailedToUpdateStock)
+		status, code, message, details := mapDomainError(err)
+		writeError(ctx, status, message, code, details)
 		return
 	}
-	ctx.JSON(http.StatusOK, stock)
+	writeSuccess(ctx, http.StatusOK, "Stock updated", stock)
 }
 
 // DeleteStock deletes a stock item by SKU.
 func (ah *AdminHandler) DeleteStock(ctx *gin.Context) {
 	sku := ctx.Param("sku")
 	if sku == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "SKU parameter is required",
-		})
+		writeError(
+			ctx,
+			http.StatusBadRequest,
+			apperror.CodeValidationErrorMessage,
+			apperror.CodeValidationErrorCode,
+			[]apimodel.ErrorDetail{{Field: "sku", Reason: "required"}},
+		)
 		return
 	}
 	err := ah.adminStockOrchestrator.DeleteStock(ctx, sku)
 	if err != nil {
-		ah.logger.Error("Failed to get stock", "error", err.Error(), "sku", sku)
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to delete stock: " + err.Error(),
-		})
+		ah.logger.WithError(err).WithFields(logger.Fields{
+			"request_id": requestIDFromContext(ctx),
+			"sku":        sku,
+		}).Error(logger.LogMessageFailedToDeleteStock)
+		status, code, message, details := mapDomainError(err)
+		writeError(ctx, status, message, code, details)
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("Stock with SKU '%s' deleted successfully", sku),
-		"sku":     sku,
-	})
+	writeSuccess(ctx, http.StatusOK, "Stock deleted", gin.H{"sku": sku})
 }
 
 // GetActiveReservationItemsBySku lists active reservation items by SKU with pagination.
 func (ah *AdminHandler) GetActiveReservationItemsBySku(ctx *gin.Context) {
 	sku := ctx.Param("sku")
 	if sku == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "SKU parameter is required",
-		})
+		writeError(
+			ctx,
+			http.StatusBadRequest,
+			apperror.CodeValidationErrorMessage,
+			apperror.CodeValidationErrorCode,
+			[]apimodel.ErrorDetail{{Field: "sku", Reason: "required"}},
+		)
 		return
 	}
 
@@ -132,16 +141,20 @@ func (ah *AdminHandler) GetActiveReservationItemsBySku(ctx *gin.Context) {
 		requestedOffset,
 	)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to list active reservation items: " + err.Error(),
-		})
+		ah.logger.WithError(err).WithFields(logger.Fields{
+			"request_id": requestIDFromContext(ctx),
+			"sku":        sku,
+			"limit":      requestedLimit,
+			"offset":     requestedOffset,
+		}).Error(logger.LogMessageFailedToGetActiveReservation)
+		status, code, msg, details := mapDomainError(err)
+		writeError(ctx, status, msg, code, details)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
+	writeSuccess(ctx, http.StatusOK, message, gin.H{
 		"sku":        sku,
 		"items":      items,
 		"pagination": pagination,
-		"message":    message,
 	})
 }

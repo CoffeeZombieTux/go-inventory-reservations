@@ -2,7 +2,7 @@ package application
 
 import (
 	"context"
-	"fmt"
+	"go-inventory-reservations/internal/apperror"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/uow"
@@ -50,9 +50,10 @@ func (ro *ReservationOrchestrator) getReservationItemsForCommit(
 	}
 
 	if len(reservedItems) == 0 {
-		return nil, fmt.Errorf(
-			"you cannot commit reservation %s because it has not been reserved items",
-			reservationID.String(),
+		return nil, apperror.New(
+			apperror.CodeValidationError,
+			"Reservation has no reserved items",
+			"reservation "+reservationID.String()+" has no reserved items",
 		)
 	}
 

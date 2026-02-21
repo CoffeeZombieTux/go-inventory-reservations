@@ -3,8 +3,9 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
+	"go-inventory-reservations/internal/apperror"
+	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/uow"
@@ -25,13 +26,15 @@ type StockRepositoryInterface interface {
 
 // StockRepository is a repository for stock management.
 type StockRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *logger.Logger
 }
 
 // NewStockRepository creates a new StockRepository instance.
-func NewStockRepository(db *sql.DB) StockRepositoryInterface {
+func NewStockRepository(db *sql.DB, log *logger.Logger) StockRepositoryInterface {
 	return &StockRepository{
-		db: db,
+		db:     db,
+		logger: log,
 	}
 }
 
@@ -81,10 +84,7 @@ func (sr *StockRepository) getBySku(
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("stock not found for SKU: %s", sku)
-		}
-		return nil, fmt.Errorf("failed to get stock: %w", err)
+		return nil, apperror.FromDB(err, "Failed to get stock", apperror.CodeInternalError)
 	}
 
 	return &stock, nil
@@ -101,9 +101,16 @@ func (sr *StockRepository) GetStocks(ctx context.Context, limit, offset int) ([]
 
 	rows, err := sr.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list stocks: %w", err)
+		return nil, apperror.FromDB(err, "Failed to list stocks", apperror.CodeInternalError)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			sr.logger.WithError(closeErr).WithFields(logger.Fields{
+				"repository": "StockRepository",
+				"method":     "GetStocks",
+			}).Error(logger.LogMessageFailedToCloseRows)
+		}
+	}()
 
 	var stocks []*model.Stock
 	for rows.Next() {
@@ -114,13 +121,13 @@ func (sr *StockRepository) GetStocks(ctx context.Context, limit, offset int) ([]
 			&stock.Reserved,
 			&stock.UpdatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("failed to scan stock row: %w", err)
+			return nil, apperror.FromDB(err, "Failed to scan stock row", apperror.CodeInternalError)
 		}
 		stocks = append(stocks, &stock)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error during row iteration: %w", err)
+		return nil, apperror.FromDB(err, "Failed to iterate stock rows", apperror.CodeInternalError)
 	}
 
 	return stocks, nil
@@ -146,7 +153,7 @@ func (sr *StockRepository) Create(ctx context.Context, stock *model.Stock) (*mod
 	).Scan(&updatedAt)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to save stock: %w", err)
+		return nil, apperror.FromDB(err, "Failed to create stock", apperror.CodeInternalError)
 	}
 
 	stock.UpdatedAt = updatedAt
@@ -155,7 +162,11 @@ func (sr *StockRepository) Create(ctx context.Context, stock *model.Stock) (*mod
 }
 
 // Update updates stock fields for a given SKU.
-func (sr *StockRepository) Update(ctx context.Context, request apimodel.StockRequest, uow *uow.UnitOfWork) (*model.Stock, error) {
+func (sr *StockRepository) Update(
+	ctx context.Context,
+	request apimodel.StockRequest,
+	uow *uow.UnitOfWork,
+) (*model.Stock, error) {
 	var exec SQLExecutor
 	if uow != nil && uow.GetTransaction() != nil {
 		exec = uow.GetTransaction()
@@ -180,7 +191,7 @@ func (sr *StockRepository) Update(ctx context.Context, request apimodel.StockReq
 		i++
 	}
 	if len(fields) == 0 {
-		return nil, fmt.Errorf("no updatable fields provided")
+		return nil, apperror.New(apperror.CodeValidationError, "No updatable fields provided")
 	}
 	args = append(args, request.SKU)
 
@@ -202,10 +213,7 @@ func (sr *StockRepository) Update(ctx context.Context, request apimodel.StockReq
 	)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("stock not found for SKU: %s", request.SKU)
-		}
-		return nil, fmt.Errorf("failed to update stock quantity: %w", err)
+		return nil, apperror.FromDB(err, "Failed to update stock quantity", apperror.CodeInternalError)
 	}
 
 	return &stock, nil
@@ -219,10 +227,7 @@ func (sr *StockRepository) Delete(ctx context.Context, sku string) error {
 	err := sr.db.QueryRowContext(ctx, query, sku).Scan(&deletedSku)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("stock not found for SKU: %s", sku)
-		}
-		return fmt.Errorf("failed to delete stock: %w", err)
+		return apperror.FromDB(err, "Failed to delete stock", apperror.CodeInternalError)
 	}
 
 	return nil
@@ -235,7 +240,7 @@ func (sr *StockRepository) Count(ctx context.Context) (int, error) {
 
 	err := sr.db.QueryRowContext(ctx, query).Scan(&count)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count stocks records: %w", err)
+		return 0, apperror.FromDB(err, "Failed to count stock records", apperror.CodeInternalError)
 	}
 
 	return count, nil

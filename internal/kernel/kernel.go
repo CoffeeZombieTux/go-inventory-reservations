@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go-inventory-reservations/internal/application"
 	"go-inventory-reservations/internal/config"
@@ -47,15 +48,15 @@ func New() (*Kernel, error) {
 
 	db, err := database.New(cfg.GetDatabaseDSN(), log.Logger)
 	if err != nil {
-		log.WithError(err).Error("Failed to initialize database")
+		log.WithError(err).Error(logger.LogMessageFailedToInitializeDatabase)
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	// Repositories
 	unitOfWork := uow.NewUnitOfWorkManager(db.DB)
-	stockRepo := repository.NewStockRepository(db.DB)
-	reservationRepo := repository.NewReservationRepository(db.DB)
-	reservationItemRepo := repository.NewReservationItemsRepository(db.DB)
+	stockRepo := repository.NewStockRepository(db.DB, log)
+	reservationRepo := repository.NewReservationRepository(db.DB, log)
+	reservationItemRepo := repository.NewReservationItemsRepository(db.DB, log)
 
 	// Services
 	stockService := service.NewStockService(stockRepo)
@@ -76,11 +77,17 @@ func New() (*Kernel, error) {
 	)
 
 	// Handlers (with all required services)
-	handlersPool := handler.NewHandlersPool(reservationOrchestrator, adminStockOrchestrator, stockService, reservationService, log)
+	handlersPool := handler.NewHandlersPool(
+		reservationOrchestrator,
+		adminStockOrchestrator,
+		stockService,
+		reservationService,
+		log,
+	)
 
 	// Gin router and HTTP server setup
 	routerEngine := gin.Default()
-	router.SetupRoutes(routerEngine, *handlersPool, cfg)
+	router.SetupRoutes(routerEngine, *handlersPool, cfg, log)
 
 	port := strconv.Itoa(cfg.Server.Port)
 	httpServer := &http.Server{
@@ -114,8 +121,8 @@ func (k *Kernel) Start(ctx context.Context) error {
 
 	go func() {
 		k.Logger.Infof("🚀 Starting HTTP server on %s...", k.HTTPServer.Addr)
-		if err := k.HTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			k.Logger.WithError(err).Error("Server failed")
+		if err := k.HTTPServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			k.Logger.WithError(err).Error(logger.LogMessageServerFailed)
 		}
 	}()
 
@@ -135,13 +142,13 @@ func (k *Kernel) Stop(ctx context.Context) error {
 	ctxShutdown, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := k.HTTPServer.Shutdown(ctxShutdown); err != nil {
-		k.Logger.WithError(err).Error("Graceful server shutdown failed")
+		k.Logger.WithError(err).Error(logger.LogMessageGracefulServerShutdownFailed)
 	} else {
 		k.Logger.Info("HTTP server stopped gracefully")
 	}
 
 	if err := k.DBConnection.Close(); err != nil {
-		k.Logger.WithError(err).Error("Failed to close database connection")
+		k.Logger.WithError(err).Error(logger.LogMessageFailedToCloseDatabaseConnection)
 	} else {
 		k.Logger.Info("Database connection closed")
 	}

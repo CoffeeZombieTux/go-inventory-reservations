@@ -2,7 +2,7 @@ package application
 
 import (
 	"context"
-	"fmt"
+	"go-inventory-reservations/internal/apperror"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/uow"
@@ -124,7 +124,11 @@ func (ro *ReservationOrchestrator) adjustReservedStockForUpdate(
 	unit *uow.UnitOfWork,
 ) (*model.Stock, error) {
 	if requiredQty > 0 && ro.stockService.CalculateAvailability(ctx, stock) < requiredQty {
-		return nil, fmt.Errorf("insufficient stock for SKU %s", sku)
+		return nil, apperror.New(
+			apperror.CodeInsufficientStock,
+			"Insufficient stock for requested items",
+			"insufficient stock for SKU "+sku,
+		)
 	}
 
 	return ro.stockService.ReserveStock(ctx, stock.SKU, requiredQty, unit)
@@ -149,7 +153,11 @@ func (ro *ReservationOrchestrator) applyNewReservationItem(
 	}
 
 	if ro.stockService.CalculateAvailability(ctx, stock) < item.Quantity {
-		return fmt.Errorf("insufficient stock for SKU %s", item.SKU)
+		return apperror.New(
+			apperror.CodeInsufficientStock,
+			"Insufficient stock for requested items",
+			"insufficient stock for SKU "+item.SKU,
+		)
 	}
 
 	_, err = ro.stockService.ReserveStock(ctx, stock.SKU, item.Quantity, unit)

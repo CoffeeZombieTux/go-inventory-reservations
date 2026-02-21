@@ -1,0 +1,26 @@
+package logger
+
+const (
+	LogMessageOutgoingHTTPResponse            = "outgoing_http_response"
+	LogMessageFailedToInitializeDatabase      = "Failed to initialize database"
+	LogMessageServerFailed                    = "Server failed"
+	LogMessageGracefulServerShutdownFailed    = "Graceful server shutdown failed"
+	LogMessageFailedToCloseDatabaseConnection = "Failed to close database connection"
+	LogMessageDatabaseHealthCheckFailed       = "Database health check failed"
+	LogMessageFailedToGetStock                = "failed_to_get_stock"
+	LogMessageFailedToListStocks              = "failed_to_list_stocks"
+	LogMessageFailedToCreateStock             = "failed_to_create_stock"
+	LogMessageFailedToUpdateStock             = "failed_to_update_stock"
+	LogMessageFailedToDeleteStock             = "failed_to_delete_stock"
+	LogMessageFailedToGetActiveReservation    = "failed_to_get_active_reservation_items"
+	LogMessageFailedToCreateReservation       = "failed_to_create_reservation"
+	LogMessageFailedToUpdateReservation       = "failed_to_update_reservation"
+	LogMessageFailedToGetReservationByID      = "failed_to_get_reservation_by_id"
+	LogMessageFailedToGetReservationByQuoteID = "failed_to_get_reservation_by_quote_id"
+	LogMessageFailedToGetReservationByOrderID = "failed_to_get_reservation_by_order_id"
+	LogMessageFailedToAttachOrder             = "failed_to_attach_order"
+	LogMessageFailedToCommitReservation       = "failed_to_commit_reservation"
+	LogMessageFailedToReleaseReservation      = "failed_to_release_reservation"
+	LogMessageFailedToRevertReservation       = "failed_to_revert_reservation"
+	LogMessageFailedToCloseRows               = "failed_to_close_rows"
+)

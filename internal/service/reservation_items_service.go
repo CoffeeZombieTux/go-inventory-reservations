@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"go-inventory-reservations/internal/apperror"
 	"go-inventory-reservations/internal/config"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/repository"
 	"go-inventory-reservations/internal/uow"
+	"strconv"
 
 	"github.com/google/uuid"
 )
@@ -164,10 +165,18 @@ func (ris ReservationItemsService) DeleteReservationItem(
 // validateReservationItemQuantity validates reservation item quantity constraints.
 func (ris ReservationItemsService) validateReservationItemQuantity(reservationItem *model.ReservationItem) error {
 	if reservationItem.Qty > ris.config.ReservationItemSettings.MaxQuantity {
-		return fmt.Errorf("quantity exceeds maximum allowed: %d", ris.config.ReservationItemSettings.MaxQuantity)
+		return apperror.New(
+			apperror.CodeValidationError,
+			"Quantity exceeds maximum allowed",
+			"max quantity: "+strconv.Itoa(ris.config.ReservationItemSettings.MaxQuantity),
+		)
 	}
 	if reservationItem.Qty < 0 {
-		return fmt.Errorf("quantity cannot be negative")
+		return apperror.New(
+			apperror.CodeValidationError,
+			"Quantity cannot be negative",
+			"qty must be >= 0",
+		)
 	}
 	return nil
 }

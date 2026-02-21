@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"go-inventory-reservations/internal/apperror"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
 	"go-inventory-reservations/internal/repository"
@@ -78,7 +79,11 @@ func (ss *StockService) GetStockBySku(ctx context.Context, sku string) (*apimode
 }
 
 // GetStockBySkuForUpdate returns a stock item by its SKU with a FOR UPDATE lock.
-func (ss *StockService) GetStockBySkuForUpdate(ctx context.Context, sku string, uow *uow.UnitOfWork) (*model.Stock, error) {
+func (ss *StockService) GetStockBySkuForUpdate(
+	ctx context.Context,
+	sku string,
+	uow *uow.UnitOfWork,
+) (*model.Stock, error) {
 	return ss.repo.GetBySkuForUpdate(ctx, sku, uow)
 }
 
@@ -141,19 +146,32 @@ func (ss *StockService) GetStocks(
 }
 
 // AdjustInventory updates the stock quantity for a given SKU.
-func (ss *StockService) AdjustInventory(ctx context.Context, req apimodel.StockRequest, uow *uow.UnitOfWork) (*model.Stock, error) {
+func (ss *StockService) AdjustInventory(
+	ctx context.Context,
+	req apimodel.StockRequest,
+	uow *uow.UnitOfWork,
+) (*model.Stock, error) {
 	return ss.repo.Update(ctx, req, uow)
 }
 
 // ReserveStock reserves a given quantity of stock items for a given SKU. Qty can be negative.
-func (ss *StockService) ReserveStock(ctx context.Context, sku string, qty int, uow *uow.UnitOfWork) (*model.Stock, error) {
+func (ss *StockService) ReserveStock(
+	ctx context.Context,
+	sku string,
+	qty int,
+	uow *uow.UnitOfWork,
+) (*model.Stock, error) {
 	stock, err := ss.GetStockBySkuForUpdate(ctx, sku, uow)
 	if err != nil {
 		return nil, err
 	}
 	newReserved := stock.Reserved + qty
 	if newReserved < 0 {
-		return nil, fmt.Errorf("cannot reserve negative quantity of stock item SKU: %s", stock.SKU)
+		return nil, apperror.New(
+			apperror.CodeValidationError,
+			"Cannot reserve negative quantity",
+			"cannot reserve negative quantity for SKU "+stock.SKU,
+		)
 	}
 	req := apimodel.StockRequest{
 		SKU:      sku,

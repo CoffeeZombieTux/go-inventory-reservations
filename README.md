@@ -107,8 +107,5 @@ Reservations are considered final if marked as one of the following:
 - All time calculations use the server’s system time.
 - Set environment variable names according to your deployment configuration.
 
-Todo: middleware auth admin / client
-Todo: logging
-Todo: response
 Todo: tests
 Todo: unit tests

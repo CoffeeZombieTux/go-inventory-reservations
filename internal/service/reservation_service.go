@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
+	"go-inventory-reservations/internal/apperror"
 	"go-inventory-reservations/internal/config"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
@@ -70,7 +70,11 @@ func (rs ReservationService) GetReservationById(ctx context.Context, id uuid.UUI
 }
 
 // GetReservationByIdForUpdate returns a reservation by its ID with FOR UPDATE lock.
-func (rs ReservationService) GetReservationByIdForUpdate(ctx context.Context, id uuid.UUID, uow *uow.UnitOfWork) (*model.Reservation, error) {
+func (rs ReservationService) GetReservationByIdForUpdate(
+	ctx context.Context,
+	id uuid.UUID,
+	uow *uow.UnitOfWork,
+) (*model.Reservation, error) {
 	reservation, err := rs.repo.GetByIdForUpdate(ctx, id, uow)
 	if err != nil {
 		return nil, err
@@ -118,6 +122,9 @@ func (rs ReservationService) AttachOrder(ctx context.Context, request apimodel.A
 	}
 
 	err = checkAvailableStatuses(*reservation, []string{statusPending})
+	if err != nil {
+		return err
+	}
 
 	reservation.OrderId = &request.OrderId
 	reservation.Status = statusReserved
@@ -223,14 +230,18 @@ func (rs ReservationService) CommitReservationHelper(
 	}
 
 	if reservation.OrderId == nil {
-		return nil, fmt.Errorf("reservation %s has no attached order", reservation.ReservationId)
+		return nil, apperror.New(
+			apperror.CodeValidationError,
+			"Reservation has no attached order",
+			"reservation "+reservation.ReservationId.String()+" has no attached order",
+		)
 	}
 
 	if *reservation.OrderId != request.OrderId {
-		err := fmt.Errorf(
-			"reservation order id %s does not match request order id %s",
-			*reservation.OrderId,
-			request.OrderId,
+		err := apperror.New(
+			apperror.CodeValidationError,
+			"Reservation order id does not match request order id",
+			"reservation order id "+*reservation.OrderId+" does not match "+request.OrderId,
 		)
 		return nil, err
 	}
@@ -287,16 +298,25 @@ func (rs ReservationService) RevertReservationHelper(
 	if err != nil {
 		return nil, err
 	}
+	err = checkAvailableStatuses(*reservation, []string{statusCommitted})
+	if err != nil {
+		return nil, err
+	}
+	if reservation.OrderId == nil {
+		return nil, apperror.New(
+			apperror.CodeValidationError,
+			"Reservation has no attached order",
+			"reservation "+reservation.ReservationId.String()+" has no attached order",
+		)
+	}
 	if *reservation.OrderId != request.OrderId {
-		err = fmt.Errorf(
-			"reservation order id %s does not match request order id %s",
-			*reservation.OrderId,
-			request.OrderId,
+		err = apperror.New(
+			apperror.CodeValidationError,
+			"Reservation order id does not match request order id",
+			"reservation order id "+*reservation.OrderId+" does not match "+request.OrderId,
 		)
 		return nil, err
 	}
-
-	err = checkAvailableStatuses(*reservation, []string{statusCommitted})
 
 	reservation.Status = statusReverted
 	reservation.ItemsHash = nil
@@ -333,7 +353,11 @@ func checkAvailableStatuses(reservation model.Reservation, allowedStatuses []str
 			return nil
 		}
 	}
-	return fmt.Errorf("reservation status %s is not allowed for this action", reservation.Status)
+	return apperror.New(
+		apperror.CodeValidationError,
+		"Reservation status is not allowed for this action",
+		"status "+reservation.Status+" is not allowed",
+	)
 }
 
 // IsReservationVersionConflict reports whether the error is an optimistic lock conflict.

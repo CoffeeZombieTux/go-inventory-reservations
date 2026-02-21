@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"go-inventory-reservations/internal/apperror"
 	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/service"
 	"net/http"
@@ -27,29 +28,33 @@ func NewStockHandler(stockService service.StockServiceInterface, logger *logger.
 func (sh *StockHandler) GetStockBySku(ctx *gin.Context) {
 	sku := ctx.Param("sku")
 	if sku == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "SKU parameter is required",
-		})
+		writeError(
+			ctx,
+			http.StatusBadRequest,
+			apperror.CodeValidationErrorMessage,
+			apperror.CodeValidationErrorCode,
+			nil,
+		)
 		return
 	}
 
 	stock, err := sh.stockService.GetStockBySku(ctx, sku)
 	if err != nil {
-		sh.logger.Error("Failed to get stock", "error", err.Error(), "sku", sku)
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to get stock: " + err.Error(),
-		})
+		sh.logger.WithError(err).WithFields(logger.Fields{
+			"request_id": requestIDFromContext(ctx),
+			"sku":        sku,
+		}).Error(logger.LogMessageFailedToGetStock)
+		status, code, message, details := mapDomainError(err)
+		writeError(ctx, status, message, code, details)
 		return
 	}
 
 	if stock == nil {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"error": "Stock not found",
-		})
+		writeError(ctx, http.StatusNotFound, apperror.CodeNotFoundMessage, apperror.CodeNotFoundCode, nil)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, stock)
+	writeSuccess(ctx, http.StatusOK, "Stock fetched", stock)
 }
 
 // GetStocks retrieves a list of stock items, optionally filtered by limit and offset.
@@ -74,14 +79,18 @@ func (sh *StockHandler) GetStocks(ctx *gin.Context) {
 
 	stocks, pagination, message, err := sh.stockService.GetStocks(ctx, requestedLimit, requestedOffset)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to list stocks: " + err.Error(),
-		})
+		sh.logger.WithError(err).WithFields(logger.Fields{
+			"request_id": requestIDFromContext(ctx),
+			"limit":      requestedLimit,
+			"offset":     requestedOffset,
+		}).Error(logger.LogMessageFailedToListStocks)
+		status, code, msg, details := mapDomainError(err)
+		writeError(ctx, status, msg, code, details)
+		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
+	writeSuccess(ctx, http.StatusOK, message, gin.H{
 		"stocks":     stocks,
 		"pagination": pagination,
-		"message":    message,
 	})
 }

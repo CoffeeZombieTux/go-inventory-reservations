@@ -18,7 +18,7 @@ Authorization: Bearer {{publicToken}}
 
 > {%
     // JavaScript code to save the reservationId from the response body
-    client.global.set("reservationId", response.body.reservation.reservation_id);
+    client.global.set("reservationId", response.body.data.reservation.reservation_id);
 %}
 
 
@@ -52,7 +52,7 @@ Authorization: Bearer {{publicToken}}
 
 > {%
     // JavaScript code to save the reservationId from the response body
-    client.global.set("reservationId", response.body.reservation.reservation_id);
+    client.global.set("reservationId", response.body.data.reservation.reservation_id);
 %}
 
 
@@ -62,7 +62,7 @@ Authorization: Bearer {{publicToken}}
 
 > {%
     // JavaScript code to save the reservationId from the response body
-    client.global.set("reservationId", response.body.reservation.reservation_id);
+    client.global.set("reservationId", response.body.data.reservation.reservation_id);
 %}
 
 ### Attach Order to reservation

@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	applogger "go-inventory-reservations/internal/logger"
 
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
@@ -52,7 +53,7 @@ func (d *Database) HealthCheck() error {
 	var result int
 	err := d.DB.QueryRow("SELECT 1").Scan(&result)
 	if err != nil {
-		d.logger.WithError(err).Error("Database health check failed")
+		d.logger.WithError(err).Error(applogger.LogMessageDatabaseHealthCheckFailed)
 		return err
 	}
 	return nil
