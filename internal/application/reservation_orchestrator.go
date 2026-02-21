@@ -2,8 +2,10 @@ package application
 
 import (
 	"context"
+	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/model"
 	apimodel "go-inventory-reservations/internal/model/api"
+	"go-inventory-reservations/internal/notifier"
 	"go-inventory-reservations/internal/service"
 	"go-inventory-reservations/internal/uow"
 
@@ -29,6 +31,8 @@ type ReservationOrchestrator struct {
 	stockService           service.StockServiceInterface
 	reservationService     service.ReservationServiceInterface
 	reservationItemService service.ReservationItemsServiceInterface
+	quoteNotifier          notifier.QuoteExpirationNotifierInterface
+	logger                 *logger.Logger
 }
 
 // NewReservationOrchestrator creates a new ReservationOrchestrator instance.
@@ -37,11 +41,15 @@ func NewReservationOrchestrator(
 	stockService service.StockServiceInterface,
 	reservationService service.ReservationServiceInterface,
 	reservationItemService service.ReservationItemsServiceInterface,
+	quoteNotifier notifier.QuoteExpirationNotifierInterface,
+	log *logger.Logger,
 ) ReservationOrchestratorInterface {
 	return &ReservationOrchestrator{
 		uowManager:             uowManager,
 		stockService:           stockService,
 		reservationService:     reservationService,
 		reservationItemService: reservationItemService,
+		quoteNotifier:          quoteNotifier,
+		logger:                 log,
 	}
 }

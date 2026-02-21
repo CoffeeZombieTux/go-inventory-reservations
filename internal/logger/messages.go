@@ -23,4 +23,8 @@ const (
 	LogMessageFailedToReleaseReservation      = "failed_to_release_reservation"
 	LogMessageFailedToRevertReservation       = "failed_to_revert_reservation"
 	LogMessageFailedToCloseRows               = "failed_to_close_rows"
+	LogMessageQuoteExpirationNotifyRequest    = "quote_expiration_notify_request"
+	LogMessageQuoteExpirationNotifyResponse   = "quote_expiration_notify_response"
+	LogMessageQuoteExpirationNotifyFailed     = "quote_expiration_notify_failed"
+	LogMessageFailedToCloseResponseBody       = "failed_to_close_response_body"
 )

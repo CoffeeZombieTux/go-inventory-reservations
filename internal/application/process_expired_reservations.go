@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/model"
 	"go-inventory-reservations/internal/service"
 	"go-inventory-reservations/internal/uow"
@@ -22,6 +23,7 @@ func (ro *ReservationOrchestrator) ProcessExpiredReservations(
 			continue
 		}
 		successCounter++
+		ro.notifyExpiredReservationAsync(reservation)
 	}
 	return successCounter, failureCounter, nil
 }
@@ -43,4 +45,23 @@ func (ro *ReservationOrchestrator) processExpiredReservation(
 		return ro.releaseReservationStocks(ctx, reservation.ReservationId, unit)
 	})
 	return err
+}
+
+// notifyExpiredReservationAsync asynchronously notifies the quote owner about the reservation expiration.
+func (ro *ReservationOrchestrator) notifyExpiredReservationAsync(reservation *model.Reservation) {
+	if ro.quoteNotifier == nil || reservation == nil {
+		return
+	}
+
+	reservationCopy := *reservation
+	go func(res model.Reservation) {
+		notifyErr := ro.quoteNotifier.NotifyQuoteExpired(context.Background(), &res)
+		if notifyErr != nil {
+			ro.logger.WithError(notifyErr).WithFields(logger.Fields{
+				"quote_id":       res.QuoteId,
+				"reservation_id": res.ReservationId.String(),
+				"status":         res.Status,
+			}).Error(logger.LogMessageQuoteExpirationNotifyFailed)
+		}
+	}(reservationCopy)
 }

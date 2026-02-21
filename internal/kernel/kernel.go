@@ -10,6 +10,7 @@ import (
 	"go-inventory-reservations/internal/database"
 	"go-inventory-reservations/internal/handler"
 	"go-inventory-reservations/internal/logger"
+	"go-inventory-reservations/internal/notifier"
 	"go-inventory-reservations/internal/repository"
 	"go-inventory-reservations/internal/router"
 	"go-inventory-reservations/internal/service"
@@ -62,12 +63,19 @@ func New() (*Kernel, error) {
 	stockService := service.NewStockService(stockRepo)
 	reservationService := service.NewReservationService(reservationRepo, cfg)
 	reservationItemService := service.NewReservationItemsService(reservationItemRepo, cfg)
+	quoteExpirationNotifier := notifier.NewQuoteExpirationNotifier(
+		cfg.Notifier.QuoteExpirationNotifyURL,
+		time.Duration(cfg.Notifier.QuoteExpirationNotifyTimeoutSecond)*time.Second,
+		log,
+	)
 
 	reservationOrchestrator := application.NewReservationOrchestrator(
 		unitOfWork,
 		stockService,
 		reservationService,
 		reservationItemService,
+		quoteExpirationNotifier,
+		log,
 	)
 
 	adminStockOrchestrator := application.NewAdminStockOrchestrator(

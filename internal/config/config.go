@@ -12,6 +12,7 @@ type Config struct {
 	Logger                  LoggerConfig
 	Server                  ServerConfig
 	Auth                    AuthConfig
+	Notifier                NotifierConfig
 	QuoteExpirationSettings QuoteExpirationSettings
 	ArchiveSettings         ArchiveSettings
 	ReservationItemSettings ReservationItemSettings
@@ -43,6 +44,12 @@ type ServerConfig struct {
 type AuthConfig struct {
 	AdminToken  string
 	PublicToken string
+}
+
+// NotifierConfig represents outbound notification settings.
+type NotifierConfig struct {
+	QuoteExpirationNotifyURL           string
+	QuoteExpirationNotifyTimeoutSecond int
 }
 
 // QuoteExpirationSettings represents the quote expiration feature settings
@@ -86,6 +93,10 @@ func Load() (*Config, error) {
 		Auth: AuthConfig{
 			AdminToken:  getEnv("ADMIN_API_TOKEN", ""),
 			PublicToken: getEnv("PUBLIC_API_TOKEN", ""),
+		},
+		Notifier: NotifierConfig{
+			QuoteExpirationNotifyURL:           getEnv("QUOTE_EXPIRATION_NOTIFY_URL", ""),
+			QuoteExpirationNotifyTimeoutSecond: getEnvInt("QUOTE_EXPIRATION_NOTIFY_TIMEOUT_SECONDS", 5),
 		},
 		QuoteExpirationSettings: QuoteExpirationSettings{
 			QuoteExpirationMinutes: getEnvInt("QUOTE_EXPIRATION_MINUTES", 15),
