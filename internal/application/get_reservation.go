@@ -57,5 +57,5 @@ func (ro *ReservationOrchestrator) GetReservationByOrderId(
 	return &apimodel.ReservationResponse{
 		Reservation: reservation,
 		Items:       items,
-	}, nil
+	}, err
 }

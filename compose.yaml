@@ -13,6 +13,18 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  db_test:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: inventory_reservations_test
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: RooT!@123
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
+
   app:
     build: .
     ports:
@@ -29,3 +41,4 @@ services:
 
 volumes:
   pgdata:
+  pgdata_test:
