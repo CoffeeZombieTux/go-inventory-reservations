@@ -195,11 +195,6 @@ make test-integration
 - Stock invariants are enforced both at DB level and service validation.
 - Structured API error envelope includes optional request id.
 
-## Code Review Notes
-
-A review and remediation summary is available in:
-- `docs/CODE_REVIEW.md`
-
 ## Demonstration Scope
 
 This is intentionally a demonstration service. Production hardening that can be added:
