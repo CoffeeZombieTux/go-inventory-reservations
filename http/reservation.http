@@ -86,7 +86,7 @@ Authorization: Bearer {{publicToken}}
 }
 
 ### Release reservation by id
-GET http://localhost:8080/reservation/{{reservationId}}/release
+PATCH http://localhost:8080/reservation/{{reservationId}}/release
 Authorization: Bearer {{publicToken}}
 
 ### Revert reservation

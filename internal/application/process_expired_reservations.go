@@ -2,8 +2,10 @@ package application
 
 import (
 	"context"
+	"errors"
 	"go-inventory-reservations/internal/logger"
 	"go-inventory-reservations/internal/model"
+	"go-inventory-reservations/internal/repository"
 	"go-inventory-reservations/internal/service"
 	"go-inventory-reservations/internal/uow"
 )
@@ -19,6 +21,9 @@ func (ro *ReservationOrchestrator) ProcessExpiredReservations(
 	for _, reservation := range reservations {
 		processErr := ro.processExpiredReservation(ctx, reservation)
 		if processErr != nil {
+			if errors.Is(processErr, repository.ErrReservationVersionConflict) {
+				continue
+			}
 			failureCounter++
 			continue
 		}
@@ -37,7 +42,7 @@ func (ro *ReservationOrchestrator) processExpiredReservation(
 		err := ro.reservationService.ExpireReservationHelper(ctx, reservation, unit)
 		if err != nil {
 			if service.IsReservationVersionConflict(err) {
-				return nil
+				return err
 			}
 			return err
 		}

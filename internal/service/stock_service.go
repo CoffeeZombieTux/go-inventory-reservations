@@ -55,6 +55,20 @@ func (ss *StockService) CreateStock(ctx context.Context, req apimodel.StockReque
 	if req.Reserved != nil {
 		reserved = *req.Reserved
 	}
+	if onHand < 0 || reserved < 0 {
+		return nil, apperror.New(
+			apperror.CodeValidationError,
+			"Stock quantities cannot be negative",
+			"on_hand and reserved must be >= 0",
+		)
+	}
+	if reserved > onHand {
+		return nil, apperror.New(
+			apperror.CodeValidationError,
+			"Reserved quantity cannot exceed on_hand",
+			"reserved must be <= on_hand",
+		)
+	}
 	stock := &model.Stock{SKU: req.SKU, OnHand: onHand, Reserved: reserved}
 	res, err := ss.repo.Create(ctx, stock)
 	if err != nil {
@@ -151,6 +165,21 @@ func (ss *StockService) AdjustInventory(
 	req apimodel.StockRequest,
 	uow *uow.UnitOfWork,
 ) (*model.Stock, error) {
+	if req.OnHand != nil && *req.OnHand < 0 {
+		return nil, apperror.New(
+			apperror.CodeValidationError,
+			"on_hand cannot be negative",
+			"on_hand must be >= 0",
+		)
+	}
+	if req.Reserved != nil && *req.Reserved < 0 {
+		return nil, apperror.New(
+			apperror.CodeValidationError,
+			"reserved cannot be negative",
+			"reserved must be >= 0",
+		)
+	}
+
 	return ss.repo.Update(ctx, req, uow)
 }
 

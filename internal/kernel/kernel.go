@@ -134,7 +134,9 @@ func (k *Kernel) Start(ctx context.Context) error {
 		}
 	}()
 
-	k.Cron.Start()
+	if k.Cron != nil {
+		k.Cron.Start()
+	}
 	k.Logger.Info("Kernel started successfully")
 	return nil
 }

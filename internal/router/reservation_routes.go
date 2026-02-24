@@ -16,6 +16,6 @@ func setupReservationRoutes(engine *gin.Engine, handlersPool handler.HandlersPoo
 	reservation.GET("/order/:order_id", handlersPool.Reservation.GetReservationByOrderId)
 	reservation.POST("/attach-order", handlersPool.Reservation.AttachOrder)
 	reservation.POST("/commit", handlersPool.Reservation.CommitReservation)
-	reservation.GET("/:id/release", handlersPool.Reservation.ReleaseReservation)
+	reservation.PATCH("/:id/release", handlersPool.Reservation.ReleaseReservation)
 	reservation.POST("/revert", handlersPool.Reservation.Revert)
 }

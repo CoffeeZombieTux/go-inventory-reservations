@@ -27,18 +27,20 @@ func InitCrons(
 		logger.Infof("Expired reservations processed cron finished. Success: %d, Fail: %d", success, fail)
 	})
 	if err != nil {
-		return nil
+		logger.WithError(err).Error("failed to schedule expire reservations cron")
+		return c
 	}
 	_, err = c.AddFunc(config.ArchiveSettings.ArchiveReservationsCronSpec, func() {
 
 		deleted, err := reservationService.ArchiveReservations(ctx)
 		if err != nil {
-			logger.Errorf("cleanup cron error: %d", err)
+			logger.Errorf("cleanup cron error: %s", err)
 		}
 		logger.Infof("Archived reservations: %d", deleted)
 	})
 	if err != nil {
-		return nil
+		logger.WithError(err).Error("failed to schedule archive reservations cron")
+		return c
 	}
 
 	logger.Info("Crons initialized successfully")
