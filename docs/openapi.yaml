@@ -1,0 +1,865 @@
+openapi: 3.0.3
+info:
+  title: Go Inventory Reservation Service API
+  version: 0.1.0
+  description: |
+    OpenAPI specification generated from current Gin routes and API models.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Health
+  - name: Stock
+  - name: Admin
+  - name: Reservation
+
+paths:
+  /ping:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: ping
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PingResponse"
+
+  /stock:
+    get:
+      tags: [Stock]
+      summary: List stock
+      operationId: getStocks
+      security:
+        - PublicBearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+          description: Page size (default 50, max 10000)
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+          description: Offset (default 0)
+      responses:
+        "200":
+          description: Stock list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StocksListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /stock/{sku}:
+    get:
+      tags: [Stock]
+      summary: Get stock by SKU
+      operationId: getStockBySku
+      security:
+        - PublicBearerAuth: []
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stock found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockItemResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /admin/stock:
+    post:
+      tags: [Admin]
+      summary: Create stock
+      operationId: createStock
+      security:
+        - AdminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockRequest"
+      responses:
+        "200":
+          description: Stock created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockModelResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      tags: [Admin]
+      summary: Update stock
+      operationId: updateStock
+      security:
+        - AdminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockRequest"
+      responses:
+        "200":
+          description: Stock updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockModelResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /admin/stock/{sku}:
+    delete:
+      tags: [Admin]
+      summary: Delete stock by SKU
+      operationId: deleteStock
+      security:
+        - AdminBearerAuth: []
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stock deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteStockResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /admin/stock/{sku}/reservation-items:
+    get:
+      tags: [Admin]
+      summary: Get active reservation items by SKU
+      operationId: getActiveReservationItemsBySku
+      security:
+        - AdminBearerAuth: []
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: Active reservation items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveReservationItemsResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /reservation:
+    post:
+      tags: [Reservation]
+      summary: Create reservation
+      operationId: createReservation
+      security:
+        - PublicBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReservationRequest"
+      responses:
+        "200":
+          description: Reservation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationEnvelopeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      tags: [Reservation]
+      summary: Update reservation
+      operationId: updateReservation
+      security:
+        - PublicBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReservationRequest"
+      responses:
+        "200":
+          description: Reservation updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationEnvelopeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /reservation/{id}:
+    get:
+      tags: [Reservation]
+      summary: Get reservation by ID
+      operationId: getReservationById
+      security:
+        - PublicBearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Reservation found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationEnvelopeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Reservation]
+      summary: Release reservation
+      operationId: releaseReservation
+      security:
+        - PublicBearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Reservation released
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageOnlyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /reservation/quote/{quote_id}:
+    get:
+      tags: [Reservation]
+      summary: Get reservation by quote ID
+      operationId: getReservationByQuoteId
+      security:
+        - PublicBearerAuth: []
+      parameters:
+        - in: path
+          name: quote_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Reservation found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationEnvelopeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /reservation/order/{order_id}:
+    get:
+      tags: [Reservation]
+      summary: Get reservation by order ID
+      operationId: getReservationByOrderId
+      security:
+        - PublicBearerAuth: []
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Reservation found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationEnvelopeResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /reservation/attach-order:
+    post:
+      tags: [Reservation]
+      summary: Attach order to reservation
+      operationId: attachOrder
+      security:
+        - PublicBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachOrderRequest"
+      responses:
+        "200":
+          description: Order attached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageOnlyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /reservation/commit:
+    post:
+      tags: [Reservation]
+      summary: Commit reservation
+      operationId: commitReservation
+      security:
+        - PublicBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommitReservationRequest"
+      responses:
+        "200":
+          description: Reservation committed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageOnlyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /reservation/revert:
+    post:
+      tags: [Reservation]
+      summary: Revert reservation
+      operationId: revertReservation
+      security:
+        - PublicBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevertReservationRequest"
+      responses:
+        "200":
+          description: Reservation reverted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageOnlyResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    PublicBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Token
+      description: Bearer token from PUBLIC_API_TOKEN
+    AdminBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Token
+      description: Bearer token from ADMIN_API_TOKEN
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ConflictError:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnprocessableEntity:
+      description: Business validation failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+        reason:
+          type: string
+      required: [reason]
+
+    ErrorObject:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+        request_id:
+          type: string
+      required: [code]
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        message:
+          type: string
+        error:
+          $ref: "#/components/schemas/ErrorObject"
+      required: [success, message, error]
+
+    StockRequest:
+      type: object
+      properties:
+        sku:
+          type: string
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+      required: [sku]
+
+    ReservationItemRequest:
+      type: object
+      properties:
+        sku:
+          type: string
+        qty:
+          type: integer
+          minimum: 0
+      required: [sku, qty]
+
+    CreateReservationRequest:
+      type: object
+      properties:
+        quote_id:
+          type: string
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ReservationItemRequest"
+      required: [quote_id, items]
+
+    UpdateReservationRequest:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        quote_id:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReservationItemRequest"
+      required: [reservation_id, quote_id, items]
+
+    AttachOrderRequest:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+      required: [reservation_id, order_id]
+
+    CommitReservationRequest:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+      required: [reservation_id, order_id]
+
+    RevertReservationRequest:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+      required: [reservation_id, order_id]
+
+    StockResponse:
+      type: object
+      properties:
+        sku:
+          type: string
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        available_quantity:
+          type: integer
+      required: [sku, on_hand, reserved, available_quantity]
+
+    StockModel:
+      type: object
+      properties:
+        sku:
+          type: string
+        on_hand:
+          type: integer
+        reserved:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+      required: [sku, on_hand, reserved]
+
+    Reservation:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, RESERVED, COMMITTED, RELEASED, REVERTED, EXPIRED]
+        quote_id:
+          type: string
+        order_id:
+          type: string
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        items_hash:
+          type: string
+          nullable: true
+        version:
+          type: integer
+      required: [reservation_id, status, quote_id, created_at, updated_at, version]
+
+    ReservationItem:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        sku:
+          type: string
+        qty:
+          type: integer
+        is_active:
+          type: boolean
+      required: [reservation_id, sku, qty, is_active]
+
+    PaginationResponse:
+      type: object
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total_items:
+          type: integer
+        current_page:
+          type: integer
+        total_pages:
+          type: integer
+      required: [limit, offset, total_items, current_page, total_pages]
+
+    ReservationResponse:
+      type: object
+      properties:
+        reservation:
+          $ref: "#/components/schemas/Reservation"
+        items:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ReservationItem"
+      required: [reservation, items]
+
+    PingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+          example: pong
+      required: [success, message]
+
+    MessageOnlyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+      required: [success, message]
+
+    StockItemResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/StockResponse"
+      required: [success, message, data]
+
+    StocksListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            stocks:
+              type: array
+              items:
+                $ref: "#/components/schemas/StockResponse"
+            pagination:
+              $ref: "#/components/schemas/PaginationResponse"
+      required: [success, message, data]
+
+    StockModelResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/StockModel"
+      required: [success, message, data]
+
+    DeleteStockResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            sku:
+              type: string
+          required: [sku]
+      required: [success, message, data]
+
+    ActiveReservationItemsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            sku:
+              type: string
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ReservationItem"
+            pagination:
+              $ref: "#/components/schemas/PaginationResponse"
+      required: [success, message, data]
+
+    ReservationEnvelopeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/ReservationResponse"
+      required: [success, message, data]

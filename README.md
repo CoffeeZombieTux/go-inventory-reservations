@@ -86,7 +86,7 @@ Sample requests are in:
 
 Main env vars (see `.env`):
 - DB: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL_MODE`
-- Server: `APP_PORT`
+- Server: `SERVER_HOST`, `SERVER_PORT`
 - Auth: `ADMIN_API_TOKEN`, `PUBLIC_API_TOKEN`
 - Expiration cron:
   - `QUOTE_EXPIRATION_MINUTES`
@@ -100,6 +100,52 @@ Main env vars (see `.env`):
   - `ARCHIVE_RESERVATIONS_COUNT_LIMIT`
 - Reservation item limit:
   - `RESERVATION_ITEM_MAX_QUANTITY` (defaults to 20 if unset)
+
+### `.env` example for local development
+
+```env
+# App server
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8080
+
+# Main DB (used by app + migrations)
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=root
+DB_PASSWORD=RooT!@123
+DB_NAME=inventory_reservations
+DB_SSL_MODE=disable
+
+# API auth tokens
+ADMIN_API_TOKEN=admin-dev-token
+PUBLIC_API_TOKEN=public-dev-token
+
+# Logging
+LOG_LEVEL=info
+LOG_FORMAT=text
+
+# Quote expiration flow
+QUOTE_EXPIRATION_MINUTES=15
+QUOTE_EXPIRATION_CRON_SPEC=@every 1m
+QUOTE_EXPIRATION_COUNT_LIMIT=1000
+QUOTE_EXPIRATION_NOTIFY_URL=
+QUOTE_EXPIRATION_NOTIFY_TIMEOUT_SECONDS=5
+
+# Archive flow
+ARCHIVE_RESERVATIONS_AFTER_DAYS=30
+ARCHIVE_RESERVATIONS_CRON_SPEC=0 4 * * *
+ARCHIVE_RESERVATIONS_COUNT_LIMIT=10000
+
+# Reservation item constraints
+RESERVATION_ITEM_MAX_QUANTITY=20
+```
+
+### Integration test DB notes
+
+`make test` / `make test-integration` use a dedicated DB on port `5433` and database `${DB_NAME}_test`.
+With the example above this resolves to:
+- `inventory_reservations_test`
+- `localhost:5433`
 
 ## Local Run
 
@@ -141,28 +187,6 @@ Or only integration-tagged tests:
 ```bash
 make test-integration
 ```
-
-### About integration tests
-Integration/full-flow tests are tagged with `integration` build tag:
-- `internal/repository/stock_repository_integration_test.go`
-- `internal/application/flows_integration_test.go`
-- `internal/application/process_expired_reservations_test.go`
-
-This keeps `go test ./...` fast for unit-only runs.
-
-## Implemented Test Coverage
-
-- Unit tests:
-  - hash function behavior (`internal/service/items_hash_test.go`)
-  - pagination parameter normalization (`internal/model/api/pagination_test.go`)
-  - stock service validation (`internal/service/stock_service_test.go`)
-  - health route (`internal/router/app_health_routes_test.go`)
-- Integration tests:
-  - reset DB + migrate + create/read stock (`internal/repository/stock_repository_integration_test.go`)
-  - full reservation lifecycle flows (`internal/application/flows_integration_test.go`)
-  - optimistic-lock conflict handling on expiration (`internal/application/process_expired_reservations_test.go`)
-
-Detailed testcase matrix: `docs/TEST_CASES.md`.
 
 ## Technical Notes
 
