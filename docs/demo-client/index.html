@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inventory Reservation Business Simulator</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --card: #ffffff;
+      --line: #d5deeb;
+      --text: #1a2638;
+      --muted: #586983;
+      --accent: #205fb9;
+      --secondary: #5e7292;
+      --ok: #0d7a43;
+      --err: #ab1f2f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, #dce8ff 0%, transparent 38%),
+        radial-gradient(circle at 90% 100%, #e0f3e7 0%, transparent 35%),
+        var(--bg);
+    }
+    .wrap { max-width: 1280px; margin: 20px auto 36px; padding: 0 14px; }
+    h1 { margin: 0; font-size: 30px; }
+    .subtitle { margin: 6px 0 14px; color: var(--muted); }
+    .stack { display: grid; gap: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(370px, 1fr)); gap: 12px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 6px 16px rgba(26, 38, 56, 0.08);
+    }
+    .card h2 { margin: 0 0 8px; font-size: 18px; }
+    .card h3 { margin: 10px 0 6px; font-size: 14px; color: #244470; }
+    .small { color: var(--muted); font-size: 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+    .grow { flex: 1; min-width: 120px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 9px;
+      font-size: 14px;
+      color: var(--text);
+      background: #fff;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    button {
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    button.secondary { background: var(--secondary); }
+    button.ghost { background: #7d8ea8; }
+    button.tiny { padding: 5px 8px; font-size: 12px; }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; max-width: 100%; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      table-layout: fixed;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 6px;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    th { color: #2d4d79; }
+    .status {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      border: 1px solid transparent;
+      display: none;
+    }
+    .status.ok { display: block; color: var(--ok); background: #edf9f2; border-color: #bfe9d0; }
+    .status.err { display: block; color: var(--err); background: #fff1f3; border-color: #f2c4cb; }
+    pre {
+      margin: 0;
+      background: #101827;
+      color: #dde8ff;
+      border-radius: 8px;
+      padding: 10px;
+      min-height: 220px;
+      overflow: auto;
+      font-size: 12px;
+    }
+    #ioLog {
+      max-height: 340px;
+      overflow: auto;
+      white-space: pre;
+    }
+    .pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #e3ecff;
+      color: #2a4f89;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+    .legend div { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: #fbfdff; font-size: 13px; }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 16, 28, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      z-index: 40;
+    }
+    .modal {
+      width: min(760px, 100%);
+      max-height: 80vh;
+      overflow: auto;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Inventory Reservation - Business Service Simulator</h1>
+  <div class="subtitle">Cart equals reservation. Submit order changes reservation to RESERVED. Ship changes to COMMITTED. Refund changes to REVERTED.</div>
+
+  <div class="stack">
+    <section class="card">
+      <h2>Environment</h2>
+      <div class="row">
+        <div class="grow">
+          <label for="baseUrl">API Base URL</label>
+          <input id="baseUrl" value="">
+        </div>
+        <div class="grow">
+          <label for="publicToken">Public Token (E-Shop / Cart / Order)</label>
+          <input id="publicToken" placeholder="PUBLIC_API_TOKEN">
+        </div>
+        <div class="grow">
+          <label for="adminToken">Admin Token</label>
+          <input id="adminToken" placeholder="ADMIN_API_TOKEN">
+        </div>
+      </div>
+      <div class="small">No actions here by request. Use panels below.</div>
+    </section>
+
+    <section class="card">
+      <h2>Admin Panel Simulator</h2>
+      <div class="small">Manage three products (create / edit / delete). Use these for the business flow.</div>
+      <table>
+        <thead>
+        <tr>
+          <th>SKU</th><th>on_hand</th><th>reserved</th><th>Actions</th>
+        </tr>
+        </thead>
+        <tbody id="adminProductsBody"></tbody>
+      </table>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>E-Shop A Simulator</h2>
+        <div class="row">
+          <div class="grow"><label for="shopAQuote">quote_id</label><input id="shopAQuote"></div>
+          <div class="grow"><label for="shopAReservation">reservation_id</label><input id="shopAReservation" readonly></div>
+        </div>
+        <div class="actions" style="margin-bottom:8px;">
+          <button id="btnReloadShopA" class="secondary">Reload Product List</button>
+        </div>
+        <table>
+          <thead>
+          <tr><th>SKU</th><th>Available</th><th>Cart Qty</th><th>Update Cart</th></tr>
+          </thead>
+          <tbody id="shopAProductsBody"></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>E-Shop B Simulator</h2>
+        <div class="row">
+          <div class="grow"><label for="shopBQuote">quote_id</label><input id="shopBQuote"></div>
+          <div class="grow"><label for="shopBReservation">reservation_id</label><input id="shopBReservation" readonly></div>
+        </div>
+        <div class="actions" style="margin-bottom:8px;">
+          <button id="btnReloadShopB" class="secondary">Reload Product List</button>
+        </div>
+        <table>
+          <thead>
+          <tr><th>SKU</th><th>Available</th><th>Cart Qty</th><th>Update Cart</th></tr>
+          </thead>
+          <tbody id="shopBProductsBody"></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Cart Service Simulator (Cart = Reservation)</h2>
+        <div class="actions" style="margin-bottom:8px;">
+          <button id="btnSeedDemo">Seed Demo Data</button>
+          <button id="btnRefreshQuotes" class="secondary">List / Refresh Quotes</button>
+        </div>
+        <table>
+          <thead>
+          <tr><th>Quote</th><th>Reservation</th><th>Status</th><th>Items</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="quotesBody"></tbody>
+        </table>
+        <div class="small" style="margin-top:6px;">Release is available only here (cart service responsibility).</div>
+      </section>
+
+      <section class="card">
+        <h2>Order Service Simulator</h2>
+        <div class="actions" style="margin-bottom:8px;">
+          <button id="btnRefreshOrders" class="secondary">Refresh Active Order States</button>
+        </div>
+        <table>
+          <thead>
+          <tr><th>Reservation</th><th>Order</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="ordersBody"></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Request / Response Inspector</h2>
+        <span class="pill" id="lastMeta">No request yet</span>
+        <div class="actions" style="margin-bottom:6px;">
+          <button id="btnOpenInspectorPopup" class="secondary tiny">Open Inspector Popup</button>
+        </div>
+        <div id="statusBox" class="status"></div>
+        <pre id="ioLog">[]</pre>
+      </section>
+
+      <section class="card">
+        <h2>Status Meaning</h2>
+        <div class="legend">
+          <div><b>PENDING</b><br>Cart created, still editable in cart service.</div>
+          <div><b>RESERVED</b><br>Order submitted (attached). Cart cannot be edited anymore.</div>
+          <div><b>COMMITTED</b><br>Order shipped. Inventory consumed.</div>
+          <div><b>REVERTED</b><br>Refund/return processed.</div>
+          <div><b>RELEASED</b><br>Cart/hold canceled by cart service.</div>
+          <div><b>EXPIRED</b><br>Cart timed out; must create a new cart.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle" style="margin:0;">Details</h3>
+      <button id="modalClose" class="ghost tiny">Close</button>
+    </div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+  const baseUrlEl = document.getElementById("baseUrl");
+  const publicTokenEl = document.getElementById("publicToken");
+  const adminTokenEl = document.getElementById("adminToken");
+  const ioLogEl = document.getElementById("ioLog");
+  const lastMetaEl = document.getElementById("lastMeta");
+  const statusBoxEl = document.getElementById("statusBox");
+  const modalBackdropEl = document.getElementById("modalBackdrop");
+  const modalTitleEl = document.getElementById("modalTitle");
+  const modalContentEl = document.getElementById("modalContent");
+
+  baseUrlEl.value = window.location.origin || "http://localhost:8080";
+
+  const adminProducts = [
+    {sku: "SKU-DEMO-1", on_hand: 20, reserved: 0},
+    {sku: "SKU-DEMO-2", on_hand: 15, reserved: 0},
+    {sku: "SKU-DEMO-3", on_hand: 12, reserved: 0}
+  ];
+
+  const shops = {
+    A: {name: "A", quoteId: "Q-ESHOP-A-001", reservationId: "", cart: {}, products: []},
+    B: {name: "B", quoteId: "Q-ESHOP-B-001", reservationId: "", cart: {}, products: []}
+  };
+
+  const knownQuotes = {};
+  const ioEntries = [];
+  let quoteSerial = 1;
+
+  function publicToken() { return publicTokenEl.value.trim(); }
+  function adminToken() { return adminTokenEl.value.trim(); }
+
+  function parseJson(text) {
+    try { return JSON.parse(text); } catch { return null; }
+  }
+
+  function setStatus(ok, msg) {
+    statusBoxEl.className = "status " + (ok ? "ok" : "err");
+    statusBoxEl.textContent = msg;
+  }
+
+  function logIO(entry) {
+    ioEntries.unshift(entry);
+    while (ioEntries.length > 25) ioEntries.pop();
+    ioLogEl.textContent = JSON.stringify(ioEntries, null, 2);
+  }
+
+  function openModal(title, html) {
+    modalTitleEl.textContent = title;
+    modalContentEl.innerHTML = html;
+    modalBackdropEl.style.display = "flex";
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function closeModal() {
+    modalBackdropEl.style.display = "none";
+  }
+
+  function nextQuoteId(shopKey) {
+    quoteSerial += 1;
+    return "Q-ESHOP-" + shopKey + "-" + String(quoteSerial).padStart(4, "0");
+  }
+
+  function resetShopForNextCart(shopKey) {
+    const shop = shops[shopKey];
+    shop.reservationId = "";
+    shop.cart = {};
+    shop.quoteId = nextQuoteId(shopKey);
+    renderShop(shopKey);
+  }
+
+  function findShopKeyByQuote(quoteId) {
+    for (const key of Object.keys(shops)) {
+      if (shops[key].quoteId === quoteId) return key;
+    }
+    return "";
+  }
+
+  async function rawApi(method, path, token, body) {
+    const url = baseUrlEl.value.replace(/\/$/, "") + path;
+    const headers = {"Content-Type": "application/json"};
+    if (token) headers.Authorization = "Bearer " + token;
+
+    const started = performance.now();
+    const resp = await fetch(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const elapsedMs = Math.round(performance.now() - started);
+    const rawText = await resp.text();
+    const parsed = parseJson(rawText);
+
+    lastMetaEl.textContent = method + " " + path + " | " + resp.status + " | " + elapsedMs + "ms";
+    logIO({
+      at: new Date().toISOString(),
+      method,
+      path,
+      requestBody: body || null,
+      status: resp.status,
+      responseBody: parsed || rawText
+    });
+    setStatus(resp.ok, resp.ok ? "Request succeeded" : "Request failed");
+    return {resp, parsed};
+  }
+
+  function quoteItemsToMap(itemsObj) {
+    const map = {};
+    if (!itemsObj || typeof itemsObj !== "object") return map;
+    for (const key of Object.keys(itemsObj)) {
+      const it = itemsObj[key];
+      if (it && it.sku) map[it.sku] = Number(it.qty || 0);
+    }
+    return map;
+  }
+
+  function updateKnownQuoteFromReservation(reservationEnvelope, fallbackQuoteId) {
+    const reservation = reservationEnvelope && reservationEnvelope.reservation;
+    if (!reservation) return;
+    const quoteId = reservation.quote_id || fallbackQuoteId;
+    if (!quoteId) return;
+
+    const itemsMap = quoteItemsToMap(reservationEnvelope.items);
+    knownQuotes[quoteId] = {
+      quoteId,
+      reservationId: reservation.reservation_id,
+      status: reservation.status,
+      orderId: reservation.order_id || "",
+      itemsMap
+    };
+
+    for (const key of Object.keys(shops)) {
+      const shop = shops[key];
+      if (shop.quoteId === quoteId) {
+        shop.reservationId = reservation.reservation_id;
+        shop.cart = {...itemsMap};
+        document.getElementById("shop" + key + "Reservation").value = shop.reservationId || "";
+      }
+    }
+  }
+
+  async function getReservationById(reservationId) {
+    const r = await rawApi("GET", "/reservation/" + encodeURIComponent(reservationId), publicToken());
+    if (r.resp.ok && r.parsed && r.parsed.data) {
+      updateKnownQuoteFromReservation(r.parsed.data);
+    }
+    renderQuotes();
+    renderOrders();
+    return r;
+  }
+
+  async function getReservationByQuote(quoteId) {
+    const r = await rawApi("GET", "/reservation/quote/" + encodeURIComponent(quoteId), publicToken());
+    if (r.resp.ok && r.parsed && r.parsed.data) {
+      updateKnownQuoteFromReservation(r.parsed.data, quoteId);
+      refreshAllShopViews();
+    }
+    renderQuotes();
+    renderOrders();
+    return r;
+  }
+
+  async function loadShopProducts(shopKey) {
+    const r = await rawApi("GET", "/stock?limit=100&offset=0", publicToken());
+    const list = r.parsed && r.parsed.data && r.parsed.data.stocks;
+    shops[shopKey].products = Array.isArray(list) ? list : [];
+    renderShop(shopKey);
+    return r;
+  }
+
+  function cartToItemsArray(cart) {
+    return Object.keys(cart)
+      .filter(sku => Number(cart[sku]) > 0)
+      .map(sku => ({sku, qty: Number(cart[sku])}));
+  }
+
+  async function syncCart(shopKey) {
+    const shop = shops[shopKey];
+    const items = cartToItemsArray(shop.cart);
+
+    if (!shop.reservationId) {
+      if (!items.length) {
+        renderQuotes();
+        return;
+      }
+      const create = await rawApi("POST", "/reservation", publicToken(), {
+        quote_id: shop.quoteId,
+        items
+      });
+      if (create.resp.ok && create.parsed && create.parsed.data) {
+        updateKnownQuoteFromReservation(create.parsed.data, shop.quoteId);
+      }
+      renderQuotes();
+      renderOrders();
+      refreshAllShopViews();
+      return;
+    }
+
+    const current = await getReservationById(shop.reservationId);
+    if (!current.resp.ok || !current.parsed || !current.parsed.data || !current.parsed.data.reservation) {
+      return;
+    }
+
+    const currentStatus = current.parsed.data.reservation.status;
+    if (currentStatus !== "PENDING") {
+      setStatus(false, "Cart cannot be edited. Current status is " + currentStatus + ".");
+      return;
+    }
+
+    if (!items.length) {
+      const release = await rawApi("PATCH", "/reservation/" + encodeURIComponent(shop.reservationId) + "/release", publicToken());
+      if (release.resp.ok) {
+        shop.reservationId = "";
+        shop.cart = {};
+        knownQuotes[shop.quoteId] = {
+          quoteId: shop.quoteId,
+          reservationId: "",
+          status: "RELEASED",
+          orderId: "",
+          itemsMap: {}
+        };
+      }
+      renderQuotes();
+      renderOrders();
+      refreshAllShopViews();
+      return;
+    }
+
+    const update = await rawApi("PUT", "/reservation", publicToken(), {
+      reservation_id: shop.reservationId,
+      quote_id: shop.quoteId,
+      items
+    });
+    if (update.resp.ok && update.parsed && update.parsed.data) {
+      updateKnownQuoteFromReservation(update.parsed.data, shop.quoteId);
+    }
+    renderQuotes();
+    renderOrders();
+    refreshAllShopViews();
+  }
+
+  function adjustCart(shopKey, sku, delta) {
+    const shop = shops[shopKey];
+    const next = Math.max(0, Number(shop.cart[sku] || 0) + delta);
+    if (next === 0) delete shop.cart[sku];
+    else shop.cart[sku] = next;
+    renderShop(shopKey);
+    syncCart(shopKey);
+  }
+
+  function renderShop(shopKey) {
+    const shop = shops[shopKey];
+    const quoteInput = document.getElementById("shop" + shopKey + "Quote");
+    const reservationInput = document.getElementById("shop" + shopKey + "Reservation");
+    quoteInput.value = shop.quoteId;
+    reservationInput.value = shop.reservationId || "";
+
+    quoteInput.onchange = () => {
+      const val = quoteInput.value.trim();
+      if (!val) return;
+      shop.quoteId = val;
+      shop.reservationId = "";
+      shop.cart = {};
+      renderShop(shopKey);
+      renderQuotes();
+    };
+
+    const body = document.getElementById("shop" + shopKey + "ProductsBody");
+    body.innerHTML = "";
+
+    if (!shop.products.length) {
+      body.innerHTML = "<tr><td colspan='4' class='small'>No products loaded</td></tr>";
+      return;
+    }
+
+    for (const p of shop.products) {
+      const qty = Number(shop.cart[p.sku] || 0);
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + p.sku + "</td>" +
+        "<td>" + p.available_quantity + "</td>" +
+        "<td>" + qty + "</td>" +
+        "<td>" +
+        "<button class='tiny secondary' data-plus='" + p.sku + "'>+</button> " +
+        "<button class='tiny ghost' data-minus='" + p.sku + "'>-</button>" +
+        "</td>";
+      body.appendChild(tr);
+    }
+
+    body.querySelectorAll("button[data-plus]").forEach(btn => {
+      btn.onclick = () => adjustCart(shopKey, btn.getAttribute("data-plus"), 1);
+    });
+    body.querySelectorAll("button[data-minus]").forEach(btn => {
+      btn.onclick = () => adjustCart(shopKey, btn.getAttribute("data-minus"), -1);
+    });
+  }
+
+  function renderAdminProducts() {
+    const body = document.getElementById("adminProductsBody");
+    body.innerHTML = "";
+
+    adminProducts.forEach((p, idx) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + p.sku + "</td>" +
+        "<td><input id='adm-on-" + idx + "' type='number' value='" + p.on_hand + "'></td>" +
+        "<td><input id='adm-rs-" + idx + "' type='number' value='" + p.reserved + "'></td>" +
+        "<td class='actions'>" +
+        "<button class='tiny' data-create='" + idx + "'>Create</button>" +
+        "<button class='tiny secondary' data-update='" + idx + "'>Edit</button>" +
+        "<button class='tiny ghost' data-delete='" + idx + "'>Delete</button>" +
+        "<button class='tiny ghost' data-active='" + idx + "'>Show Active Reservations</button>" +
+        "</td>";
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll("button[data-create]").forEach(btn => {
+      btn.onclick = async () => {
+        const i = Number(btn.getAttribute("data-create"));
+        const p = adminProducts[i];
+        await rawApi("POST", "/admin/stock", adminToken(), {
+          sku: p.sku,
+          on_hand: Number(document.getElementById("adm-on-" + i).value),
+          reserved: Number(document.getElementById("adm-rs-" + i).value)
+        });
+        refreshAllShopProducts();
+      };
+    });
+
+    body.querySelectorAll("button[data-update]").forEach(btn => {
+      btn.onclick = async () => {
+        const i = Number(btn.getAttribute("data-update"));
+        const p = adminProducts[i];
+        await rawApi("PUT", "/admin/stock", adminToken(), {
+          sku: p.sku,
+          on_hand: Number(document.getElementById("adm-on-" + i).value),
+          reserved: Number(document.getElementById("adm-rs-" + i).value)
+        });
+        refreshAllShopProducts();
+      };
+    });
+
+    body.querySelectorAll("button[data-delete]").forEach(btn => {
+      btn.onclick = async () => {
+        const i = Number(btn.getAttribute("data-delete"));
+        const p = adminProducts[i];
+        await rawApi("DELETE", "/admin/stock/" + encodeURIComponent(p.sku), adminToken());
+        refreshAllShopProducts();
+      };
+    });
+
+    body.querySelectorAll("button[data-active]").forEach(btn => {
+      btn.onclick = async () => {
+        const i = Number(btn.getAttribute("data-active"));
+        const p = adminProducts[i];
+        const r = await rawApi("GET", "/admin/stock/" + encodeURIComponent(p.sku) + "/reservation-items?limit=50&offset=0", adminToken());
+        const items = r.parsed && r.parsed.data && r.parsed.data.items;
+        if (!r.resp.ok || !Array.isArray(items) || items.length === 0) {
+          openModal("Active reservations for " + p.sku, "<p class='small'>No active reservations for this product.</p>");
+          return;
+        }
+        const rows = items.map(it =>
+          "<tr><td>" + (it.reservation_id || "-") + "</td><td>" + (it.qty ?? "-") + "</td><td>" + (it.is_active ? "true" : "false") + "</td></tr>"
+        ).join("");
+        openModal(
+          "Active reservations for " + p.sku,
+          "<table><thead><tr><th>Reservation ID</th><th>Qty</th><th>is_active</th></tr></thead><tbody>" + rows + "</tbody></table>"
+        );
+      };
+    });
+  }
+
+  function quoteItemsText(itemsMap) {
+    const parts = Object.keys(itemsMap || {}).map(sku => sku + ":" + itemsMap[sku]);
+    return parts.join(", ");
+  }
+
+  function renderQuotes() {
+    const body = document.getElementById("quotesBody");
+    body.innerHTML = "";
+
+    const quoteIds = Object.keys(knownQuotes).sort();
+    if (!quoteIds.length) {
+      body.innerHTML = "<tr><td colspan='5' class='small'>No quotes known yet</td></tr>";
+      return;
+    }
+
+    quoteIds.forEach(quoteId => {
+      const q = knownQuotes[quoteId];
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + q.quoteId + "</td>" +
+        "<td>" + (q.reservationId || "-") + "</td>" +
+        "<td>" + (q.status || "-") + "</td>" +
+        "<td>" + quoteItemsText(q.itemsMap) + "</td>" +
+        "<td class='actions'>" +
+        "<button class='tiny secondary' data-refresh='" + quoteId + "'>Get State</button>" +
+        "<button class='tiny' data-submit='" + quoteId + "'>Submit Order</button>" +
+        "<button class='tiny ghost' data-release='" + quoteId + "'>Release Quote</button>" +
+        "<button class='tiny' data-to-order='" + quoteId + "'>Use in Order Panel</button>" +
+        "</td>";
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll("button[data-refresh]").forEach(btn => {
+      btn.onclick = () => getReservationByQuote(btn.getAttribute("data-refresh"));
+    });
+
+    body.querySelectorAll("button[data-submit]").forEach(btn => {
+      btn.onclick = () => submitOrderAttachByQuote(btn.getAttribute("data-submit"));
+    });
+
+    body.querySelectorAll("button[data-release]").forEach(btn => {
+      btn.onclick = async () => {
+        const quoteId = btn.getAttribute("data-release");
+        const q = knownQuotes[quoteId];
+        if (!q || !q.reservationId) {
+          setStatus(false, "No reservation_id for quote " + quoteId);
+          return;
+        }
+        await rawApi("PATCH", "/reservation/" + encodeURIComponent(q.reservationId) + "/release", publicToken());
+        await getReservationById(q.reservationId);
+        const shopKey = findShopKeyByQuote(quoteId);
+        if (shopKey) resetShopForNextCart(shopKey);
+        refreshAllShopViews();
+      };
+    });
+
+    body.querySelectorAll("button[data-to-order]").forEach(btn => {
+      btn.onclick = () => {
+        const quoteId = btn.getAttribute("data-to-order");
+        const q = knownQuotes[quoteId];
+        if (!q) return;
+        openModal(
+          "Quote " + q.quoteId,
+          "<p><b>Reservation:</b> " + (q.reservationId || "-") + "</p>" +
+          "<p><b>Status:</b> " + (q.status || "-") + "</p>" +
+          "<p><b>Order:</b> " + (q.orderId || "-") + "</p>" +
+          "<p><b>Items:</b> " + quoteItemsText(q.itemsMap) + "</p>"
+        );
+      };
+    });
+  }
+
+  function renderOrders() {
+    const body = document.getElementById("ordersBody");
+    body.innerHTML = "";
+
+    const rows = Object.values(knownQuotes).filter(q => ["RESERVED", "COMMITTED", "REVERTED"].includes(q.status));
+    if (!rows.length) {
+      body.innerHTML = "<tr><td colspan='4' class='small'>No reservations in RESERVED/COMMITTED/REVERTED yet</td></tr>";
+      return;
+    }
+
+    rows.forEach(q => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + (q.reservationId || "-") + "</td>" +
+        "<td>" + (q.orderId || "-") + "</td>" +
+        "<td>" + q.status + "</td>" +
+        "<td class='actions'>" +
+        "<button class='tiny secondary' data-refresh-order='" + q.reservationId + "'>Get State</button>" +
+        "<button class='tiny' data-ship='" + q.reservationId + "'>Ship (Commit)</button>" +
+        "<button class='tiny ghost' data-refund='" + q.reservationId + "'>Refund (Revert)</button>" +
+        "</td>";
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll("button[data-refresh-order]").forEach(btn => {
+      btn.onclick = () => getReservationById(btn.getAttribute("data-refresh-order"));
+    });
+
+    body.querySelectorAll("button[data-ship]").forEach(btn => {
+      btn.onclick = () => commitReservation(btn.getAttribute("data-ship"));
+    });
+
+    body.querySelectorAll("button[data-refund]").forEach(btn => {
+      btn.onclick = () => revertReservation(btn.getAttribute("data-refund"));
+    });
+  }
+
+  async function submitOrderAttachByQuote(quoteId) {
+    const q = knownQuotes[quoteId];
+    if (!q || !q.reservationId) {
+      setStatus(false, "Cannot submit order: reservation is missing for quote " + quoteId);
+      return;
+    }
+    const reservationId = q.reservationId;
+    const orderId = q.orderId || ("ORDER-" + quoteId.replace(/[^A-Z0-9]/g, "").slice(-10));
+
+    const current = await getReservationById(reservationId);
+    if (!current.resp.ok || !current.parsed || !current.parsed.data || !current.parsed.data.reservation) return;
+    const status = current.parsed.data.reservation.status;
+
+    if (status === "EXPIRED") {
+      setStatus(false, "Cannot submit order: reservation is EXPIRED");
+      return;
+    }
+    if (status !== "PENDING") {
+      setStatus(false, "Cannot submit order: reservation status is " + status + " (must be PENDING)");
+      return;
+    }
+
+    await rawApi("POST", "/reservation/attach-order", publicToken(), {
+      reservation_id: reservationId,
+      order_id: orderId
+    });
+    await getReservationById(reservationId);
+    const shopKey = findShopKeyByQuote(quoteId);
+    if (shopKey) resetShopForNextCart(shopKey);
+    refreshAllShopViews();
+  }
+
+  async function commitReservation(reservationId) {
+    const current = await getReservationById(reservationId);
+    if (!current.resp.ok || !current.parsed || !current.parsed.data || !current.parsed.data.reservation) return;
+    const reservation = current.parsed.data.reservation;
+    if (reservation.status !== "RESERVED") {
+      setStatus(false, "Ship allowed only for RESERVED reservation. Current: " + reservation.status);
+      return;
+    }
+
+    await rawApi("POST", "/reservation/commit", publicToken(), {
+      reservation_id: reservationId,
+      order_id: reservation.order_id || ""
+    });
+    await getReservationById(reservationId);
+    refreshAllShopViews();
+  }
+
+  async function revertReservation(reservationId) {
+    const current = await getReservationById(reservationId);
+    if (!current.resp.ok || !current.parsed || !current.parsed.data || !current.parsed.data.reservation) return;
+    const reservation = current.parsed.data.reservation;
+    if (reservation.status !== "COMMITTED") {
+      setStatus(false, "Refund allowed only for COMMITTED reservation. Current: " + reservation.status);
+      return;
+    }
+
+    await rawApi("POST", "/reservation/revert", publicToken(), {
+      reservation_id: reservationId,
+      order_id: reservation.order_id || ""
+    });
+    await getReservationById(reservationId);
+    refreshAllShopViews();
+  }
+
+  async function refreshAllShopProducts() {
+    await loadShopProducts("A");
+    await loadShopProducts("B");
+  }
+
+  function refreshAllShopViews() {
+    renderShop("A");
+    renderShop("B");
+    renderQuotes();
+    renderOrders();
+  }
+
+  async function refreshKnownQuotes() {
+    const quoteIds = new Set([...Object.keys(knownQuotes), shops.A.quoteId, shops.B.quoteId]);
+    for (const qid of quoteIds) {
+      if (!qid) continue;
+      await getReservationByQuote(qid);
+    }
+    refreshAllShopViews();
+  }
+
+  async function seedDemoData() {
+    const suffix = Date.now().toString().slice(-5);
+    quoteSerial = Number(suffix);
+    shops.A.quoteId = "Q-ESHOP-A-" + suffix;
+    shops.B.quoteId = "Q-ESHOP-B-" + suffix;
+    shops.A.reservationId = "";
+    shops.B.reservationId = "";
+    shops.A.cart = {"SKU-DEMO-1": 2, "SKU-DEMO-2": 1};
+    shops.B.cart = {"SKU-DEMO-3": 2};
+
+    for (const p of adminProducts) {
+      await rawApi("POST", "/admin/stock", adminToken(), p);
+    }
+
+    renderShop("A");
+    renderShop("B");
+    await syncCart("A");
+    await syncCart("B");
+    await refreshAllShopProducts();
+    refreshAllShopViews();
+  }
+
+  document.getElementById("btnReloadShopA").onclick = () => loadShopProducts("A");
+  document.getElementById("btnReloadShopB").onclick = () => loadShopProducts("B");
+  document.getElementById("btnSeedDemo").onclick = seedDemoData;
+  document.getElementById("btnRefreshQuotes").onclick = refreshKnownQuotes;
+  document.getElementById("btnRefreshOrders").onclick = refreshKnownQuotes;
+  document.getElementById("btnOpenInspectorPopup").onclick = () => {
+    openModal(
+      "Request / Response Inspector",
+      "<pre style='max-height:65vh;overflow:auto;'>" + escapeHtml(JSON.stringify(ioEntries, null, 2)) + "</pre>"
+    );
+  };
+  document.getElementById("modalClose").onclick = closeModal;
+  modalBackdropEl.onclick = (e) => {
+    if (e.target === modalBackdropEl) closeModal();
+  };
+
+  renderAdminProducts();
+  renderShop("A");
+  renderShop("B");
+  renderQuotes();
+  renderOrders();
+</script>
+</body>
+</html>

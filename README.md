@@ -82,6 +82,10 @@ Sample requests are in:
 - `http/reservation.http`
 - `http/health_check.http`
 
+Demo client:
+- `GET /demo` (served by the API itself)
+- file: `docs/demo-client/index.html`
+
 ## Configuration
 
 Main env vars (see `.env`):
@@ -153,6 +157,9 @@ With the example above this resolves to:
 ```bash
 make up
 ```
+
+Then open:
+- `http://localhost:8080/demo`
 
 ### Stop
 ```bash

@@ -12,6 +12,7 @@ import (
 func SetupRoutes(engine *gin.Engine, handlersPool handler.HandlersPool, cfg *config.Config, log *logger.Logger) {
 	engine.Use(middleware.RequestID())
 	engine.Use(middleware.HTTPLogging(log))
+	setupDemoClientRoute(engine)
 
 	setupAppHealthRoutes(engine)
 
