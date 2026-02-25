@@ -147,11 +147,28 @@ With the example above this resolves to:
 - `inventory_reservations_test`
 - `localhost:5433`
 
-## Local Run
+## How to Run
+
+### Clone this repo
+clone repo from git
+
+### Create .env file
+create `.env` file from `.env.example`
 
 ### Start app and DB
 ```bash
 make up
+```
+
+### Run migrations
+```bash
+make migrate-up
+```
+
+### Start demonstration client (if you need)
+
+```bash
+make run-demo-ui
 ```
 
 ### Stop
@@ -159,7 +176,7 @@ make up
 make down
 ```
 
-### Migrations
+## Migrations
 ```bash
 make migrate-up
 make migrate-down
