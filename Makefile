@@ -52,6 +52,12 @@ build:
 up:
 	docker compose up
 
+run-demo-ui:
+	go run demo/client.go
+
+build-demo-cli:
+	go build demo/client.go
+
 test-db-up:
 	docker compose up -d db_test
 

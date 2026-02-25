@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go-inventory-reservations/internal/config"
 	"go-inventory-reservations/internal/handler"
@@ -10,6 +11,12 @@ import (
 
 // SetupRoutes sets up the application routes
 func SetupRoutes(engine *gin.Engine, handlersPool handler.HandlersPool, cfg *config.Config, log *logger.Logger) {
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-Id"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	engine.Use(cors.New(config))
+
 	engine.Use(middleware.RequestID())
 	engine.Use(middleware.HTTPLogging(log))
 

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Reservation Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-btn.active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <header class="mb-8 border-b pb-4">
+            <h1 class="text-3xl font-bold text-gray-900">📦 Inventory Reservation Demo</h1>
+            <p class="text-gray-600 mt-2">Explore the lifecycle of stock and reservations across different business scopes.</p>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex space-x-4 mb-8 border-b">
+            <button onclick="showTab('admin')" id="tab-admin-btn" class="tab-btn active px-4 py-2 font-medium text-gray-500 hover:text-gray-700">🛠️ Admin Scope</button>
+            <button onclick="showTab('eshop')" id="tab-eshop-btn" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">🛒 E-Shop (Customer)</button>
+            <button onclick="showTab('crm')" id="tab-crm-btn" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700">📊 CRM (Management)</button>
+        </nav>
+
+        <!-- Admin Tab -->
+        <section id="tab-admin" class="tab-content active space-y-6">
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <h2 class="text-xl font-semibold mb-4">Inventory Management</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">SKU</label>
+                        <input type="text" id="admin-sku" value="LAPTOP-001" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">On Hand Quantity</label>
+                        <input type="number" id="admin-qty" value="10" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="upsertStock()" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Upsert Stock</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">On Hand</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reserved</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Available</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stock-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Stock items will be listed here -->
+                        </tbody>
+                    </table>
+                    <div class="mt-4">
+                        <button onclick="fetchStocks()" class="text-sm text-blue-600 hover:underline">🔄 Refresh Inventory</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- E-Shop Tab -->
+        <section id="tab-eshop" class="tab-content space-y-6">
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <h2 class="text-xl font-semibold mb-4">Place a Reservation (Quote)</h2>
+                <div id="eshop-cart" class="space-y-4">
+                    <div class="flex space-x-4 items-end bg-gray-50 p-4 rounded">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700">Select Item</label>
+                            <select id="cart-item-sku" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                                <!-- Populated from stocks -->
+                            </select>
+                        </div>
+                        <div class="w-24">
+                            <label class="block text-sm font-medium text-gray-700">Qty</label>
+                            <input type="number" id="cart-item-qty" value="1" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                        </div>
+                        <button onclick="addToCart()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Add to Cart</button>
+                    </div>
+
+                    <div class="mt-6">
+                        <h3 class="font-medium mb-2">Shopping Cart</h3>
+                        <ul id="cart-list" class="divide-y border rounded-md px-4">
+                            <li class="py-3 text-gray-500 italic text-center">Cart is empty</li>
+                        </ul>
+                    </div>
+
+                    <div class="mt-6 flex justify-between space-x-4">
+                        <div class="flex items-center">
+                            <button onclick="fetchStocks()" class="text-sm text-blue-600 hover:underline flex items-center">
+                                <span class="mr-1">🔄</span> Refresh Stocks
+                            </button>
+                        </div>
+                        <div class="space-x-4">
+                            <button onclick="clearCart()" class="text-gray-600 px-4 py-2">Clear</button>
+                            <button id="submit-reservation-btn" onclick="submitReservation()" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400">Create Reservation Hold</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="active-reservation-card" class="mt-8 hidden border-t pt-6">
+                    <div class="bg-blue-50 border border-blue-200 p-4 rounded-md">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="text-blue-800 font-bold text-lg">Active Reservation: <span id="active-res-id"></span></h3>
+                                <p class="text-blue-600">Status: <span id="active-res-status" class="font-semibold uppercase"></span></p>
+                                <p class="text-blue-600 text-sm">Quote ID: <span id="active-res-quote"></span></p>
+                            </div>
+                            <div class="space-x-2">
+                                <button onclick="releaseReservation()" class="text-red-600 text-sm hover:underline">Cancel/Release</button>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 space-y-4">
+                            <div class="p-4 bg-white rounded border">
+                                <h4 class="font-medium mb-3">Final Step: Complete Checkout</h4>
+                                <div class="flex space-x-2">
+                                    <input type="text" id="checkout-order-id" placeholder="Enter Order ID (e.g. ORD-123)" class="flex-1 rounded-md border-gray-300 shadow-sm p-2 border">
+                                    <button onclick="attachOrder()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Submit Order</button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">Attaching an order moves the reservation from PENDING to RESERVED status.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CRM Tab -->
+        <section id="tab-crm" class="tab-content space-y-6">
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <h2 class="text-xl font-semibold mb-4">Order Management (CRM)</h2>
+                
+                <!-- Search Box -->
+                <div class="mb-6 flex space-x-2">
+                    <input type="text" id="crm-search-input" placeholder="Search by Order ID, Quote ID, or Res ID" class="flex-1 rounded-md border-gray-300 shadow-sm p-2 border">
+                    <select id="crm-search-type" class="rounded-md border-gray-300 shadow-sm p-2 border">
+                        <option value="order">Order ID</option>
+                        <option value="quote">Quote ID</option>
+                        <option value="id">Reservation ID</option>
+                    </select>
+                    <button onclick="searchReservation()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">🔍 Search</button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reservation ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="crm-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Log Area -->
+        <footer class="mt-12 bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-xs overflow-y-auto max-h-60 shadow-inner">
+            <div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-1">
+                <span class="font-bold text-gray-400">System Logs</span>
+                <button onclick="clearLogs()" class="text-gray-500 hover:text-gray-300">Clear</button>
+            </div>
+            <div id="logs" class="space-y-1">
+                <div>[System] Ready. Ensure Go API is running at localhost:8080</div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:8080";
+        const ADMIN_TOKEN = "admin-token";
+        const PUBLIC_TOKEN = "public-token";
+
+        let currentCart = [];
+        let stocks = [];
+        let activeReservation = null;
+        let crmReservation = null; // Reservation currently viewed in CRM
+
+        // UI Helpers
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            document.getElementById(`tab-${tabId}-btn`).classList.add('active');
+            
+            if (tabId === 'admin') fetchStocks();
+            if (tabId === 'crm') fetchCrmData();
+        }
+
+        function log(msg, type = 'info') {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+            let color = 'text-green-400';
+            if (type === 'error') color = 'text-red-400';
+            if (type === 'warn') color = 'text-yellow-400';
+            
+            entry.innerHTML = `<span class="text-gray-500">[${time}]</span> <span class="${color}">${msg}</span>`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function clearLogs() { document.getElementById('logs').innerHTML = ''; }
+
+        // API Client
+        async function callAPI(method, path, token, body = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            };
+            if (body) options.body = JSON.stringify(body);
+
+            try {
+                const resp = await fetch(`${API_BASE}${path}`, options);
+                const data = await resp.json();
+                if (!resp.ok || !data.success) {
+                    const errorMsg = data.message || `HTTP ${resp.status}`;
+                    log(`API Error: ${method} ${path} -> ${errorMsg}`, 'error');
+                    return { success: false, message: errorMsg, error: data.error };
+                }
+                return data;
+            } catch (err) {
+                log(`Network Error: ${err.message}`, 'error');
+                return { success: false, message: err.message };
+            }
+        }
+
+        // Admin Actions
+        async function fetchStocks() {
+            log(`System: Refreshing stocks...`);
+            const res = await callAPI('GET', '/stock', PUBLIC_TOKEN);
+            if (res.success) {
+                stocks = res.data.stocks || [];
+                renderStocks();
+                renderCartSelect();
+            }
+        }
+
+        async function upsertStock() {
+            const sku = document.getElementById('admin-sku').value;
+            const onHand = parseInt(document.getElementById('admin-qty').value);
+            
+            log(`Admin: Upserting stock for ${sku}...`);
+            // Try to create first
+            let res = await callAPI('POST', '/admin/stock', ADMIN_TOKEN, { sku, on_hand: onHand });
+            
+            // If it already exists (409 Conflict), try to update it
+            if (!res.success && res.error && (res.error.code === 'DB_DUPLICATE_KEY' || res.error.code === 'CONFLICT')) {
+                 log(`Admin: Stock for ${sku} already exists, updating instead...`, 'warn');
+                 res = await callAPI('PUT', '/admin/stock', ADMIN_TOKEN, { sku, on_hand: onHand });
+            }
+
+            if (res.success) {
+                log(`Admin: Stock for ${sku} updated successfully!`);
+                fetchStocks();
+            }
+        }
+
+        function renderStocks() {
+            const body = document.getElementById('stock-table-body');
+            body.innerHTML = stocks.map(s => `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${s.sku}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${s.on_hand}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${s.reserved}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold ${s.available_quantity > 0 ? 'text-green-600' : 'text-red-600'}">${s.available_quantity}</td>
+                </tr>
+            `).join('');
+        }
+
+        // E-Shop Actions
+        function renderCartSelect() {
+            const select = document.getElementById('cart-item-sku');
+            select.innerHTML = stocks.map(s => `<option value="${s.sku}">${s.sku} (Available: ${s.available_quantity})</option>`).join('');
+        }
+
+        function addToCart() {
+            const sku = document.getElementById('cart-item-sku').value;
+            const qty = parseInt(document.getElementById('cart-item-qty').value);
+            if (!sku) return;
+
+            const existing = currentCart.find(i => i.sku === sku);
+            if (existing) {
+                existing.qty += qty;
+            } else {
+                currentCart.push({ sku, qty });
+            }
+            renderCart();
+        }
+
+        function renderCart() {
+            const list = document.getElementById('cart-list');
+            if (currentCart.length === 0) {
+                list.innerHTML = '<li class="py-3 text-gray-500 italic text-center">Cart is empty</li>';
+                document.getElementById('submit-reservation-btn').disabled = true;
+                return;
+            }
+
+            list.innerHTML = currentCart.map((item, idx) => `
+                <li class="py-3 flex justify-between items-center">
+                    <span><span class="font-bold">${item.sku}</span> x ${item.qty}</span>
+                    <button onclick="removeFromCart(${idx})" class="text-red-500 text-sm">Remove</button>
+                </li>
+            `).join('');
+            document.getElementById('submit-reservation-btn').disabled = false;
+        }
+
+        function removeFromCart(idx) {
+            currentCart.splice(idx, 1);
+            renderCart();
+        }
+
+        function clearCart() {
+            currentCart = [];
+            renderCart();
+        }
+
+        async function submitReservation() {
+            const quoteId = 'Q-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+            log(`E-Shop: Creating reservation for ${quoteId}...`);
+            
+            const res = await callAPI('POST', '/reservation', PUBLIC_TOKEN, {
+                quote_id: quoteId,
+                items: currentCart
+            });
+
+            if (res.success) {
+                // The API returns ReservationResponse which has 'reservation' field
+                activeReservation = res.data.reservation;
+                log(`E-Shop: Reservation ${activeReservation.reservation_id} created! Stock is now HELD.`);
+                showActiveReservation();
+                clearCart();
+                fetchStocks(); // Refresh availability
+            }
+        }
+
+        function showActiveReservation() {
+            document.getElementById('active-reservation-card').classList.remove('hidden');
+            document.getElementById('active-res-id').textContent = activeReservation.reservation_id;
+            document.getElementById('active-res-status').textContent = activeReservation.status;
+            document.getElementById('active-res-quote').textContent = activeReservation.quote_id;
+            document.getElementById('checkout-order-id').value = '';
+        }
+
+        async function releaseReservation() {
+            if (!activeReservation) return;
+            log(`E-Shop: Releasing reservation ${activeReservation.reservation_id}...`);
+            const res = await callAPI('PATCH', `/reservation/${activeReservation.reservation_id}/release`, PUBLIC_TOKEN);
+            if (res.success) {
+                log(`E-Shop: Reservation released. Stock returned to inventory.`);
+                activeReservation = null;
+                document.getElementById('active-reservation-card').classList.add('hidden');
+                fetchStocks();
+            }
+        }
+
+        async function attachOrder() {
+            const orderId = document.getElementById('checkout-order-id').value;
+            if (!orderId) { alert("Please enter an Order ID"); return; }
+
+            log(`E-Shop: Attaching Order ${orderId} to reservation...`);
+            const res = await callAPI('POST', '/reservation/attach-order', PUBLIC_TOKEN, {
+                reservation_id: activeReservation.reservation_id,
+                order_id: orderId
+            });
+
+            if (res.success) {
+                log(`E-Shop: Order attached! Reservation is now RESERVED (waiting for shipment).`);
+                activeReservation.status = 'RESERVED';
+                activeReservation.order_id = orderId; // Update local state
+                showActiveReservation();
+                fetchStocks(); // Refresh availability (though reserved quantity doesn't change, it's good practice)
+            }
+        }
+
+        // CRM Actions
+        async function fetchCrmData() {
+            log(`CRM: Updating view...`);
+            
+            // If we have an active reservation from E-Shop and no CRM search result yet, use it
+            if (activeReservation && !crmReservation) {
+                crmReservation = activeReservation;
+            }
+
+            if (crmReservation) {
+                const res = await callAPI('GET', `/reservation/${crmReservation.reservation_id}`, PUBLIC_TOKEN);
+                if (res.success) {
+                    crmReservation = res.data.reservation;
+                    log(`CRM: Refreshed status for ${crmReservation.reservation_id}: ${crmReservation.status}`);
+                }
+            }
+            
+            renderCrm();
+        }
+
+        async function searchReservation() {
+            const val = document.getElementById('crm-search-input').value.trim();
+            const type = document.getElementById('crm-search-type').value;
+            if (!val) return;
+
+            log(`CRM: Searching for reservation by ${type}: ${val}...`);
+            let path = '';
+            if (type === 'id') path = `/reservation/${val}`;
+            else if (type === 'quote') path = `/reservation/quote/${val}`;
+            else if (type === 'order') path = `/reservation/order/${val}`;
+
+            const res = await callAPI('GET', path, PUBLIC_TOKEN);
+            if (res.success) {
+                crmReservation = res.data.reservation;
+                log(`CRM: Found reservation ${crmReservation.reservation_id}`);
+                renderCrm();
+            } else {
+                crmReservation = null;
+                renderCrm();
+            }
+        }
+
+        function renderCrm() {
+            const body = document.getElementById('crm-table-body');
+            if (!crmReservation) {
+                body.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-400 italic">No reservation selected or found. Try searching above.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-xs font-mono">${crmReservation.reservation_id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${crmReservation.order_id || '---'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold uppercase ${getStatusClass(crmReservation.status)}">
+                            ${crmReservation.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        ${crmReservation.status === 'RESERVED' ? `
+                            <button onclick="commitOrder()" class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">Ship/Commit</button>
+                        ` : ''}
+                        ${crmReservation.status === 'COMMITTED' ? `
+                            <button onclick="revertOrder()" class="bg-orange-600 text-white px-3 py-1 rounded text-xs hover:bg-orange-700">Revert/Return</button>
+                        ` : ''}
+                        ${crmReservation.status !== 'RESERVED' && crmReservation.status !== 'COMMITTED' ? '---' : ''}
+                    </td>
+                </tr>
+            `;
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+                case 'RESERVED': return 'bg-blue-100 text-blue-800';
+                case 'COMMITTED': return 'bg-green-100 text-green-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        async function commitOrder() {
+            if (!crmReservation || !crmReservation.order_id) return;
+            log(`CRM: Committing shipment for Order ${crmReservation.order_id}...`);
+            const res = await callAPI('POST', '/reservation/commit', PUBLIC_TOKEN, {
+                reservation_id: crmReservation.reservation_id,
+                order_id: crmReservation.order_id
+            });
+
+            if (res.success) {
+                log(`CRM: Order committed! Inventory physically consumed.`);
+                crmReservation.status = 'COMMITTED';
+                renderCrm();
+                fetchStocks();
+            }
+        }
+
+        async function revertOrder() {
+            if (!crmReservation || !crmReservation.order_id) return;
+            if (!confirm(`Are you sure you want to revert Order ${crmReservation.order_id}? This will return stock to inventory.`)) return;
+
+            log(`CRM: Reverting Order ${crmReservation.order_id}...`);
+            const res = await callAPI('POST', '/reservation/revert', PUBLIC_TOKEN, {
+                reservation_id: crmReservation.reservation_id,
+                order_id: crmReservation.order_id
+            });
+
+            if (res.success) {
+                log(`CRM: Order reverted successfully! Stock returned to inventory.`);
+                crmReservation.status = 'REVERTED';
+                renderCrm();
+                fetchStocks();
+            }
+        }
+
+        // Initialize
+        fetchStocks();
+    </script>
+</body>
+</html>
